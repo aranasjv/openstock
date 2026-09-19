@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight, Sparkles, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { explainCandidate } from '@/lib/actions/screener.actions';
 import type { ScreenerCandidate } from '@/lib/actions/screener.actions';
+import { openCoinDrawer } from '@/lib/coin-drawer-event';
 import { formatCryptoPrice, formatPrice } from '@/lib/utils';
 
 interface CandidateRowProps {
@@ -60,23 +61,44 @@ export default function CandidateRow({ rank, candidate, assetType, strategyId }:
 
     const detailPath = assetType === 'crypto' ? `/crypto/${candidate.symbol}` : `/stocks/${candidate.symbol}`;
 
+    // On crypto the drawer is the detail view, so the name opens it directly and the chevron
+    // keeps the checklist toggle separate. Stocks have no drawer, so the name still expands.
+    const isCrypto = assetType === 'crypto';
+    const handleNameClick = () => {
+        if (isCrypto) openCoinDrawer(candidate.symbol);
+        else setExpanded((v) => !v);
+    };
+
     return (
         <div className="border-b border-gray-800/60 last:border-0">
             <div className="flex items-center gap-2 px-3 py-2">
                 <span className="w-5 shrink-0 text-[11px] text-gray-600">{rank}</span>
 
+                {/* Separate toggle so expansion stays reachable for crypto rows, where the
+                    name opens the drawer. */}
                 <button
                     type="button"
                     onClick={() => setExpanded((v) => !v)}
-                    className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
                     aria-expanded={expanded}
+                    aria-label={expanded ? 'Hide conditions' : 'Show conditions'}
+                    className="shrink-0 rounded p-0.5 text-gray-500 hover:bg-white/10 hover:text-gray-300"
                 >
                     {expanded ? (
-                        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-gray-500" />
+                        <ChevronDown className="h-3.5 w-3.5" />
                     ) : (
-                        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-500" />
+                        <ChevronRight className="h-3.5 w-3.5" />
                     )}
-                    <span className="truncate text-sm font-medium text-gray-100">{candidate.name}</span>
+                </button>
+
+                <button
+                    type="button"
+                    onClick={handleNameClick}
+                    title={isCrypto ? 'Open details' : undefined}
+                    className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+                >
+                    <span className="truncate text-sm font-medium text-gray-100 hover:text-teal-300">
+                        {candidate.name}
+                    </span>
                     <span className="shrink-0 text-[11px] text-gray-600">
                         {candidate.matched}/{candidate.total}
                     </span>
@@ -142,9 +164,19 @@ export default function CandidateRow({ rank, candidate, assetType, strategyId }:
                             <Sparkles className="mr-1.5 h-3 w-3" />
                             {pending ? 'Generating…' : 'Explain with AI'}
                         </Button>
-                        <a href={detailPath} className="text-xs text-teal-400 hover:text-teal-300">
-                            View details →
-                        </a>
+                        {isCrypto ? (
+                            <button
+                                type="button"
+                                onClick={() => openCoinDrawer(candidate.symbol)}
+                                className="text-xs text-teal-400 hover:text-teal-300"
+                            >
+                                Open details →
+                            </button>
+                        ) : (
+                            <a href={detailPath} className="text-xs text-teal-400 hover:text-teal-300">
+                                View details →
+                            </a>
+                        )}
                     </div>
 
                     {explanation ? (

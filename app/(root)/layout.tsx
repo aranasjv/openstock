@@ -1,5 +1,6 @@
 import Header from "@/components/Header";
 import Sidebar from "@/components/layout/Sidebar";
+import CoinDrawerHost from "@/components/crypto/CoinDrawerHost";
 import { getAuth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -36,6 +37,8 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
                 </main>
             </div>
 
+            {/* Single drawer host: any coin row anywhere can open it via an event. */}
+            <CoinDrawerHost />
             <DonatePopup />
         </div>
     )

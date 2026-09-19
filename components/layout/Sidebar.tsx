@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import SidebarNav from '@/components/layout/SidebarNav';
+import SidebarPickRows from '@/components/layout/SidebarPickRows';
 import { searchStocks } from '@/lib/actions/finnhub.actions';
 import { searchCrypto } from '@/lib/actions/crypto.actions';
 import { getPortfolioSummary } from '@/lib/actions/holdings.actions';
@@ -41,45 +42,6 @@ export default async function Sidebar({ user }: { user: User }) {
         .slice(0, 2);
 
     const pnlPositive = portfolio.totalPnl >= 0;
-
-    const PickRows = ({
-        picks,
-        isCrypto,
-    }: {
-        picks: { symbol: string; price: number; score: number; tier: string }[];
-        isCrypto: boolean;
-    }) =>
-        picks.length > 0 ? (
-            <ul className="mt-1 space-y-1">
-                {picks.map((pick) => (
-                    <li key={pick.symbol} className="flex items-center justify-between gap-1.5">
-                        <Link
-                            href={isCrypto ? `/crypto/${pick.symbol}` : `/stocks/${pick.symbol}`}
-                            className="truncate text-[11px] text-gray-300 hover:text-teal-300"
-                            title={pick.symbol}
-                        >
-                            {pick.symbol}
-                        </Link>
-                        <span className="shrink-0 font-mono text-[10px] text-gray-600">
-                            {isCrypto ? formatCryptoPrice(pick.price) : formatPrice(pick.price)}
-                        </span>
-                        <span
-                            className={`shrink-0 rounded px-1 text-[10px] ${
-                                pick.tier === 'Strong'
-                                    ? 'bg-emerald-950/60 text-emerald-300'
-                                    : pick.tier === 'Moderate'
-                                        ? 'bg-teal-950/60 text-teal-300'
-                                        : 'bg-gray-800 text-gray-400'
-                            }`}
-                        >
-                            {pick.score}
-                        </span>
-                    </li>
-                ))}
-            </ul>
-        ) : (
-            <p className="mt-1 text-[10px] text-gray-700">No matches</p>
-        );
 
     return (
         <aside className="hidden w-60 shrink-0 flex-col border-r border-gray-800 bg-black lg:flex">
@@ -128,14 +90,14 @@ export default async function Sidebar({ user }: { user: User }) {
                         <div className="text-[10px] font-medium uppercase tracking-wider text-gray-700">
                             Stocks
                         </div>
-                        <PickRows picks={topStocks} isCrypto={false} />
+                        <SidebarPickRows picks={topStocks} isCrypto={false} />
                     </div>
 
                     <div className="mt-2.5">
                         <div className="text-[10px] font-medium uppercase tracking-wider text-gray-700">
                             Crypto
                         </div>
-                        <PickRows picks={topCrypto} isCrypto />
+                        <SidebarPickRows picks={topCrypto} isCrypto />
                     </div>
                 </div>
 

@@ -1,9 +1,8 @@
 'use client';
 
-import { useState } from 'react';
 import Image from 'next/image';
 import { ChevronRight } from 'lucide-react';
-import CoinDetailDrawer from './CoinDetailDrawer';
+import { openCoinDrawer } from '@/lib/coin-drawer-event';
 import { formatCryptoPrice } from '@/lib/utils';
 
 interface TopCoinsTableProps {
@@ -18,11 +17,10 @@ interface TopCoinsTableProps {
  * Volume. Those figures now live in the drawer, which is where you go for detail anyway —
  * the table stays scannable at any panel width.
  *
- * Clicking a row opens the drawer rather than navigating away, so the table stays visible.
+ * Clicking a row opens the shared drawer rather than navigating away, so the table stays
+ * visible.
  */
 export default function TopCoinsTable({ coins }: TopCoinsTableProps) {
-    const [selectedId, setSelectedId] = useState<string | null>(null);
-
     if (!coins || coins.length === 0) {
         return (
             <div className="flex h-full flex-col items-center justify-center rounded-xl border border-gray-800 bg-gray-900/30 p-6 text-center text-sm text-gray-500">
@@ -62,16 +60,13 @@ export default function TopCoinsTable({ coins }: TopCoinsTableProps) {
                                         : change >= 0
                                             ? 'text-emerald-400'
                                             : 'text-red-400';
-                                const isSelected = selectedId === coin.id;
 
                                 return (
                                     <tr
                                         key={coin.id}
-                                        onClick={() => setSelectedId(coin.id)}
+                                        onClick={() => openCoinDrawer(coin.id)}
                                         title="Click for details"
-                                        className={`cursor-pointer border-b border-gray-800/60 transition-colors last:border-0 ${
-                                            isSelected ? 'bg-teal-950/40' : 'hover:bg-white/5'
-                                        }`}
+                                        className="cursor-pointer border-b border-gray-800/60 transition-colors last:border-0 hover:bg-white/5"
                                     >
                                         <td className="px-2 py-1.5 text-[11px] text-gray-600">
                                             {coin.marketCapRank ?? '-'}
@@ -116,8 +111,6 @@ export default function TopCoinsTable({ coins }: TopCoinsTableProps) {
                     </table>
                 </div>
             </div>
-
-            <CoinDetailDrawer coinId={selectedId} onClose={() => setSelectedId(null)} />
         </>
     );
 }
