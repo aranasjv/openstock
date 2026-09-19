@@ -123,16 +123,19 @@ async function callTelegram<T>(
         const cause = (error as { cause?: { code?: string } })?.cause?.code;
         const message = error instanceof Error ? error.message : 'Telegram request failed.';
 
-        // A network block is worth naming explicitly. "fetch failed" reads like a bad token,
-        // and this project's diagnostics showed exactly that: Telegram reachable over IPv6 but
-        // hanging over IPv4 (TCP connects, then TLS never completes), while a container with
-        // no IPv6 route can only try IPv4.
+        // A timeout is worth naming, because "fetch failed" reads like a bad token.
+        //
+        // The specific trap here: Node races IPv4 and IPv6 (Happy Eyeballs), and a container
+        // with no IPv6 route black-holes an AAAA connection instead of failing fast. This is
+        // addressed in instrumentation.ts; the hint remains because a host genuinely behind a
+        // network that blocks Telegram needs the proxy option.
         if (cause === 'ETIMEDOUT' || cause === 'ECONNRESET' || cause === 'UND_ERR_CONNECT_TIMEOUT') {
             return {
                 ok: false,
                 error:
-                    `Cannot reach ${apiBase} (${cause}). This is a network problem, not a bad token. ` +
-                    `If a network blocks Telegram, point TELEGRAM_API_BASE_URL at a proxy that can reach it.`,
+                    `Timed out reaching ${apiBase} (${cause}). This is a connectivity problem, not a bad token — ` +
+                    `the bot token was not rejected. If this network blocks Telegram, point ` +
+                    `TELEGRAM_API_BASE_URL at a proxy that can reach it.`,
             };
         }
 
