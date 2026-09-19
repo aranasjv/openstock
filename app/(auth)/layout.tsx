@@ -3,10 +3,14 @@ import React from "react";
 import Image from "next/image";
 import {headers} from "next/headers";
 import {redirect} from "next/navigation";
-import {auth} from "@/lib/better-auth/auth";
+import {getAuth} from "@/lib/better-auth/auth";
+
+// Session-dependent: never prerender at build time (keeps builds database-free).
+export const dynamic = 'force-dynamic';
 
 const Layout = async ({ children }: { children : React.ReactNode }) => {
 
+    const auth = await getAuth();
     const session = await auth.api.getSession({headers: await headers()});
 
     if (session?.user) redirect('/')

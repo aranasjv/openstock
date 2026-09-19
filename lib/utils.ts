@@ -231,3 +231,105 @@ export function formatSymbolForTradingView(symbol: string): string {
 
     return upperSymbol;
 }
+
+/**
+ * Maps CoinGecko coin ids to TradingView crypto pairs.
+ *
+ * TradingView resolves crypto through an exchange prefix (e.g. "BINANCE:BTCUSDT").
+ * Only the major listed pairs are mapped explicitly; anything else falls back to
+ * TradingView's generic "CRYPTO:" prefix, which may not resolve for obscure coins.
+ */
+const COINGECKO_ID_TO_TRADINGVIEW: Record<string, string> = {
+    'bitcoin': 'BINANCE:BTCUSDT',
+    'ethereum': 'BINANCE:ETHUSDT',
+    'ripple': 'BINANCE:XRPUSDT',
+    'binancecoin': 'BINANCE:BNBUSDT',
+    'solana': 'BINANCE:SOLUSDT',
+    'usd-coin': 'BINANCE:USDCUSDT',
+    'dogecoin': 'BINANCE:DOGEUSDT',
+    'cardano': 'BINANCE:ADAUSDT',
+    'tron': 'BINANCE:TRXUSDT',
+    'avalanche-2': 'BINANCE:AVAXUSDT',
+    'shiba-inu': 'BINANCE:SHIBUSDT',
+    'polkadot': 'BINANCE:DOTUSDT',
+    'chainlink': 'BINANCE:LINKUSDT',
+    'toncoin': 'BINANCE:TONUSDT',
+    'sui': 'BINANCE:SUIUSDT',
+    'stellar': 'BINANCE:XLMUSDT',
+    'hedera-hashgraph': 'BINANCE:HBARUSDT',
+    'litecoin': 'BINANCE:LTCUSDT',
+    'bitcoin-cash': 'BINANCE:BCHUSDT',
+    'uniswap': 'BINANCE:UNIUSDT',
+    'near': 'BINANCE:NEARUSDT',
+    'aptos': 'BINANCE:APTUSDT',
+    'internet-computer': 'BINANCE:ICPUSDT',
+    'ethereum-classic': 'BINANCE:ETCUSDT',
+    'monero': 'BINANCE:XMRUSDT',
+    'filecoin': 'BINANCE:FILUSDT',
+    'cosmos': 'BINANCE:ATOMUSDT',
+    'arbitrum': 'BINANCE:ARBUSDT',
+    'optimism': 'BINANCE:OPUSDT',
+    'injective-protocol': 'BINANCE:INJUSDT',
+    'render-token': 'BINANCE:RENDERUSDT',
+    'cronos': 'BINANCE:CROUSDT',
+    'algorand': 'BINANCE:ALGOUSDT',
+    'the-graph': 'BINANCE:GRTUSDT',
+    'vechain': 'BINANCE:VETUSDT',
+    'maker': 'BINANCE:MKRUSDT',
+    'aave': 'BINANCE:AAVEUSDT',
+    'theta-token': 'BINANCE:THETAUSDT',
+    'axie-infinity': 'BINANCE:AXSUSDT',
+    'decentraland': 'BINANCE:MANAUSDT',
+    'the-sandbox': 'BINANCE:SANDUSDT',
+    'eos': 'BINANCE:EOSUSDT',
+    'tezos': 'BINANCE:XTZUSDT',
+    'flow': 'BINANCE:FLOWUSDT',
+    'fantom': 'BINANCE:FTMUSDT',
+};
+
+export function formatCryptoSymbolForTradingView(coinId: string): string {
+    if (!coinId) return '';
+    const id = coinId.trim().toLowerCase();
+
+    const mapped = COINGECKO_ID_TO_TRADINGVIEW[id];
+    if (mapped) return mapped;
+
+    return `CRYPTO:${id.toUpperCase()}USD`;
+}
+
+/**
+ * Crypto prices span many orders of magnitude — BTC at ~$100k and a small-cap at
+ * $0.0000012. A fixed 2-decimal format renders the latter as "$0.00", so decimals
+ * scale with the magnitude of the value.
+ */
+export function formatCryptoPrice(price: number): string {
+    if (!Number.isFinite(price)) return 'N/A';
+
+    const abs = Math.abs(price);
+    let maximumFractionDigits: number;
+
+    if (abs >= 1) maximumFractionDigits = 2;
+    else if (abs >= 0.01) maximumFractionDigits = 4;
+    else if (abs >= 0.0001) maximumFractionDigits = 6;
+    else maximumFractionDigits = 10;
+
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: abs >= 1 ? 2 : 0,
+        maximumFractionDigits,
+    }).format(price);
+}
+
+/**
+ * Compact formatting for raw quantities (volume, supply). Unlike `formatNumber`,
+ * this does not assume the input is denominated in millions.
+ */
+export function formatCompactNumber(value: number): string {
+    if (!Number.isFinite(value) || value <= 0) return 'N/A';
+
+    return new Intl.NumberFormat('en-US', {
+        notation: 'compact',
+        maximumFractionDigits: 2,
+    }).format(value);
+}

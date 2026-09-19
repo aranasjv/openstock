@@ -14,6 +14,7 @@ interface CreateAlertModalProps {
     symbol: string;
     currentPrice: number;
     companyName?: string; // Optional prop for better display
+    assetType?: 'stock' | 'crypto';
     onAlertCreated?: () => void;
     children?: React.ReactNode;
     // Controlled props
@@ -26,6 +27,7 @@ export default function CreateAlertModal({
     symbol,
     currentPrice,
     companyName = "",
+    assetType = 'stock',
     onAlertCreated,
     children,
     open: controlledOpen,
@@ -56,6 +58,7 @@ export default function CreateAlertModal({
                 symbol,
                 targetPrice: parseFloat(targetPrice),
                 condition,
+                assetType,
             });
             toast.success("Alert created successfully");
             setOpen?.(false);
@@ -92,9 +95,11 @@ export default function CreateAlertModal({
                         />
                     </div>
 
-                    {/* Stock Identifier */}
+                    {/* Asset Identifier */}
                     <div className="grid gap-2">
-                        <Label className="text-gray-400 text-sm font-medium">Stock identifier</Label>
+                        <Label className="text-gray-400 text-sm font-medium">
+                            {assetType === 'crypto' ? 'Coin identifier' : 'Stock identifier'}
+                        </Label>
                         <div className="relative">
                             <Input
                                 disabled

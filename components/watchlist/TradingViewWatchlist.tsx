@@ -5,9 +5,16 @@ import { formatSymbolForTradingView } from '@/lib/utils';
 
 interface TradingViewWatchlistProps {
     symbols: string[];
+    /** Override how a stored symbol maps to a TradingView symbol (e.g. for crypto). */
+    formatSymbol?: (symbol: string) => string;
+    groupName?: string;
 }
 
-function TradingViewWatchlist({ symbols }: TradingViewWatchlistProps) {
+function TradingViewWatchlist({
+    symbols,
+    formatSymbol = formatSymbolForTradingView,
+    groupName = 'My Watchlist',
+}: TradingViewWatchlistProps) {
     const container = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -26,7 +33,7 @@ function TradingViewWatchlist({ symbols }: TradingViewWatchlistProps) {
         // Since we don't have exchange data easily, we'll try raw symbol. 
         // Ideally we'd prefix "NASDAQ:" or "NYSE:" but let's test without first.
         const symbolList = symbols.map(s => ({
-            name: formatSymbolForTradingView(s),
+            name: formatSymbol(s),
             displayName: s
         }));
 
@@ -35,7 +42,7 @@ function TradingViewWatchlist({ symbols }: TradingViewWatchlistProps) {
             "height": 550,
             "symbolsGroups": [
                 {
-                    "name": "My Watchlist",
+                    "name": groupName,
                     "symbols": symbolList
                 }
             ],

@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+    output: 'standalone',
     devIndicators: false,
     turbopack: {
         root: process.cwd(),
@@ -17,6 +18,18 @@ const nextConfig: NextConfig = {
             {
                 protocol: 'https',
                 hostname: 'static2.finnhub.io',
+                port: '',
+                pathname: '/**',
+            },
+            {
+                protocol: 'https',
+                hostname: 'assets.coingecko.com',
+                port: '',
+                pathname: '/**',
+            },
+            {
+                protocol: 'https',
+                hostname: 'coin-images.coingecko.com',
                 port: '',
                 pathname: '/**',
             },

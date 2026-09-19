@@ -3,9 +3,13 @@ import Image from "next/image";
 import NavItems from "@/components/NavItems";
 import UserDropdown from "@/components/UserDropdown";
 import {searchStocks} from "@/lib/actions/finnhub.actions";
+import {searchCrypto} from "@/lib/actions/crypto.actions";
 
 const Header = async ({ user }: { user: User }) => {
-    const initialStocks = await searchStocks();
+    const [initialStocks, initialCoins] = await Promise.all([
+        searchStocks(),
+        searchCrypto(),
+    ]);
 
     return (
         <header className="sticky top-0 header">
@@ -19,10 +23,10 @@ const Header = async ({ user }: { user: User }) => {
                     />
                 </Link>
                 <nav className="hidden sm:block">
-                    <NavItems initialStocks={initialStocks}/>
+                    <NavItems initialStocks={initialStocks} initialCoins={initialCoins}/>
                 </nav>
 
-                <UserDropdown user={user} initialStocks={initialStocks} />
+                <UserDropdown user={user} initialStocks={initialStocks} initialCoins={initialCoins} />
             </div>
         </header>
     )

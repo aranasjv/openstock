@@ -225,25 +225,56 @@ export const checkStockAlerts = inngest.createFunction(
             return { message: 'No active alerts to check.' };
         }
 
-        // Step 2: Group by symbol
-        const symbols = [...new Set(activeAlerts.map((a: any) => a.symbol))];
+        // Step 2: Group symbols by asset type
+        const stockSymbols = [
+            ...new Set(
+                activeAlerts
+                    .filter((a: any) => (a.assetType ?? 'stock') === 'stock')
+                    .map((a: any) => a.symbol)
+            ),
+        ];
+        const cryptoSymbols = [
+            ...new Set(
+                activeAlerts
+                    .filter((a: any) => a.assetType === 'crypto')
+                    .map((a: any) => a.symbol)
+            ),
+        ];
 
         // Step 3: Fetch prices
         const prices = await step.run('fetch-prices', async () => {
-            const { getQuote } = await import("@/lib/actions/finnhub.actions");
             const priceMap: Record<string, number> = {};
 
-            // Process in chunks to be safe
-            for (const sym of symbols) {
-                try {
-                    const quote = await getQuote(sym as string);
-                    if (quote && quote.c) {
-                        priceMap[sym as string] = quote.c;
+            if (stockSymbols.length > 0) {
+                const { getQuote } = await import("@/lib/actions/finnhub.actions");
+
+                // Process in chunks to be safe
+                for (const sym of stockSymbols) {
+                    try {
+                        const quote = await getQuote(sym as string);
+                        if (quote && quote.c) {
+                            priceMap[sym as string] = quote.c;
+                        }
+                    } catch (e) {
+                        console.error(`Failed to fetch price for ${sym}`, e);
                     }
-                } catch (e) {
-                    console.error(`Failed to fetch price for ${sym}`, e);
                 }
             }
+
+            if (cryptoSymbols.length > 0) {
+                try {
+                    // One batched CoinGecko call for every crypto alert.
+                    const { getCryptoMarketsByIds } = await import("@/lib/actions/crypto.actions");
+                    const markets = await getCryptoMarketsByIds(cryptoSymbols as string[]);
+                    for (const coin of markets) {
+                        // Alert symbols are stored uppercase, so match that key.
+                        priceMap[coin.id.toUpperCase()] = coin.currentPrice;
+                    }
+                } catch (e) {
+                    console.error('Failed to fetch crypto prices', e);
+                }
+            }
+
             return priceMap;
         });
 

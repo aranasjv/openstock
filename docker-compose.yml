@@ -2,15 +2,27 @@ services:
   openstock:
     build:
       context: .
-      extra_hosts:
-        - "mongodb:host-gateway"
+      args:
+        # Baked into the client bundle at build time, so it must be a build arg.
+        NEXT_PUBLIC_FINNHUB_API_KEY: ${NEXT_PUBLIC_FINNHUB_API_KEY}
     ports:
       - "3000:3000"
-    env_file:
-      - .env
+    environment:
+      # Set explicitly rather than via env_file: the local .env points Mongo at
+      # 127.0.0.1, which inside this container is the container itself, not the
+      # mongodb service.
+      NODE_ENV: production
+      MONGODB_URI: mongodb://root:example@mongodb:27017/openstock?authSource=admin
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      NEXT_PUBLIC_FINNHUB_API_KEY: ${NEXT_PUBLIC_FINNHUB_API_KEY}
+      FINNHUB_BASE_URL: ${FINNHUB_BASE_URL:-https://finnhub.io/api/v1}
+      # Server-only; read at runtime, never bundled into the client.
+      COINGECKO_API_KEY: ${COINGECKO_API_KEY:-}
     restart: unless-stopped
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy
 
   mongodb:
     image: mongo:7

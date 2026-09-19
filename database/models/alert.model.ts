@@ -3,6 +3,7 @@ import { Schema, model, models, type Document, type Model } from 'mongoose';
 export interface IAlert extends Document {
     userId: string;
     symbol: string;
+    assetType: 'stock' | 'crypto';
     targetPrice: number;
     condition: 'ABOVE' | 'BELOW';
     active: boolean;
@@ -15,6 +16,13 @@ const AlertSchema = new Schema<IAlert>(
     {
         userId: { type: String, required: true, index: true },
         symbol: { type: String, required: true, uppercase: true, trim: true },
+        assetType: {
+            type: String,
+            enum: ['stock', 'crypto'],
+            default: 'stock',
+            required: true,
+            index: true,
+        },
         targetPrice: { type: Number, required: true },
         condition: { type: String, enum: ['ABOVE', 'BELOW'], required: true },
         active: { type: Boolean, default: true },

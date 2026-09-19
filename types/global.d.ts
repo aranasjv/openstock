@@ -215,6 +215,72 @@ declare global {
         threshold: number;
         changePercent?: number;
     };
+
+    // -- Crypto (CoinGecko) --
+
+    type AssetType = 'stock' | 'crypto';
+
+    type CryptoCoin = {
+        id: string;      // CoinGecko id, e.g. "bitcoin" — used as the route + stored symbol
+        symbol: string;  // ticker, e.g. "BTC"
+        name: string;
+        image?: string;
+        marketCapRank?: number;
+    };
+
+    type CryptoCoinWithWatchlistStatus = CryptoCoin & {
+        isInWatchlist: boolean;
+    };
+
+    type CryptoMarketCoin = CryptoCoin & {
+        currentPrice: number;
+        changePercent24h: number | null;
+        marketCap: number;
+        totalVolume: number;
+        high24h?: number;
+        low24h?: number;
+        ath?: number;
+        atl?: number;
+        circulatingSupply?: number;
+        totalSupply?: number;
+    };
+
+    type CryptoCoinDetail = CryptoMarketCoin & {
+        description?: string;
+        homepage?: string;
+        subreddit?: string;
+        lastUpdated?: string;
+    };
+
+    type CryptoQuote = {
+        id: string;
+        name: string;
+        symbol: string;
+        image?: string;
+        price: number;
+        changePercent24h: number | null;
+        marketCap: number;
+    };
+
+    type CryptoDetailsPageProps = {
+        params: Promise<{ id: string }>;
+    };
+
+    type CryptoSearchCommandProps = {
+        renderAs?: 'button' | 'text';
+        label?: string;
+        initialCoins: CryptoCoinWithWatchlistStatus[];
+    };
+
+    type CryptoWatchlistManagerProps = {
+        initialItems: Array<{
+            symbol: string;
+            company: string;
+            assetType?: AssetType;
+            addedAt?: string;
+        }>;
+        userId: string;
+    };
 }
 
 export {};

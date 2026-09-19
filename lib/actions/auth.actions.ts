@@ -1,11 +1,12 @@
 'use server';
 
-import { auth } from "@/lib/better-auth/auth";
+import { getAuth } from "@/lib/better-auth/auth";
 import { inngest } from "@/lib/inngest/client";
 import { headers } from "next/headers";
 
 export const signUpWithEmail = async ({ email, password, fullName, country, investmentGoals, riskTolerance, preferredIndustry }: SignUpFormData) => {
     try {
+        const auth = await getAuth();
         const response = await auth.api.signUpEmail({ body: { email, password, name: fullName } })
 
         if (response) {
@@ -31,6 +32,7 @@ export const signUpWithEmail = async ({ email, password, fullName, country, inve
 
 export const signInWithEmail = async ({ email, password }: SignInFormData) => {
     try {
+        const auth = await getAuth();
         const response = await auth.api.signInEmail({ body: { email, password } })
 
         // Update lastActiveAt
@@ -76,7 +78,7 @@ export const requestPasswordResetEmail = async ({ email }: { email: string }) =>
             }
         }
 
-        await auth.api.requestPasswordReset({
+        await (await getAuth()).api.requestPasswordReset({
             body: {
                 email,
                 redirectTo: `${baseUrl}/reset-password`,
@@ -94,7 +96,7 @@ export const resetPasswordWithToken = async (
     { token, newPassword }: { token: string; newPassword: string }
 ) => {
     try {
-        await auth.api.resetPassword({
+        await (await getAuth()).api.resetPassword({
             body: {
                 token,
                 newPassword,
@@ -110,7 +112,7 @@ export const resetPasswordWithToken = async (
 
 export const signOut = async () => {
     try {
-        await auth.api.signOut({ headers: await headers() });
+        await (await getAuth()).api.signOut({ headers: await headers() });
     } catch (e) {
         console.log('Sign out failed', e)
         return { success: false, error: 'Sign out failed' }

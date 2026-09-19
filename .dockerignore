@@ -1,0 +1,17 @@
+node_modules
+.next
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+coverage
+*.tsbuildinfo
+next-env.d.ts
+.idea
+.vscode
+.DS_Store
+README.md

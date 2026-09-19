@@ -4,25 +4,34 @@ import { connectToDatabase } from '@/database/mongoose';
 import { Watchlist } from '@/database/models/watchlist.model';
 import { revalidatePath } from 'next/cache';
 
+type AssetType = 'stock' | 'crypto';
+
 // -- CRUD Operations --
 
-export async function addToWatchlist(userId: string, symbol: string, company: string) {
+export async function addToWatchlist(
+    userId: string,
+    symbol: string,
+    company: string,
+    assetType: AssetType = 'stock'
+) {
     try {
         await connectToDatabase();
 
         // Upsert to avoid duplicates/errors if it already exists
         const newItem = await Watchlist.findOneAndUpdate(
-            { userId, symbol: symbol.toUpperCase() },
+            { userId, symbol: symbol.toUpperCase(), assetType },
             {
                 userId,
                 symbol: symbol.toUpperCase(),
                 company,
+                assetType,
                 addedAt: new Date()
             },
             { upsert: true, new: true }
         );
 
         revalidatePath('/watchlist');
+        revalidatePath('/crypto/watchlist');
         return JSON.parse(JSON.stringify(newItem));
     } catch (error) {
         console.error('Error adding to watchlist:', error);
@@ -30,11 +39,16 @@ export async function addToWatchlist(userId: string, symbol: string, company: st
     }
 }
 
-export async function removeFromWatchlist(userId: string, symbol: string) {
+export async function removeFromWatchlist(
+    userId: string,
+    symbol: string,
+    assetType: AssetType = 'stock'
+) {
     try {
         await connectToDatabase();
-        await Watchlist.findOneAndDelete({ userId, symbol: symbol.toUpperCase() });
+        await Watchlist.findOneAndDelete({ userId, symbol: symbol.toUpperCase(), assetType });
         revalidatePath('/watchlist');
+        revalidatePath('/crypto/watchlist');
         revalidatePath('/'); // In case it's used elsewhere
         return { success: true };
     } catch (error) {
@@ -43,10 +57,11 @@ export async function removeFromWatchlist(userId: string, symbol: string) {
     }
 }
 
-export async function getUserWatchlist(userId: string) {
+export async function getUserWatchlist(userId: string, assetType?: AssetType) {
     try {
         await connectToDatabase();
-        const watchlist = await Watchlist.find({ userId }).sort({ addedAt: -1 });
+        const filter = assetType ? { userId, assetType } : { userId };
+        const watchlist = await Watchlist.find(filter).sort({ addedAt: -1 });
         return JSON.parse(JSON.stringify(watchlist));
     } catch (error) {
         console.error('Error fetching watchlist:', error);
@@ -55,10 +70,14 @@ export async function getUserWatchlist(userId: string) {
 }
 
 // Check if a symbol is in the user's watchlist
-export async function isStockInWatchlist(userId: string, symbol: string) {
+export async function isStockInWatchlist(
+    userId: string,
+    symbol: string,
+    assetType: AssetType = 'stock'
+) {
     try {
         await connectToDatabase();
-        const item = await Watchlist.findOne({ userId, symbol: symbol.toUpperCase() });
+        const item = await Watchlist.findOne({ userId, symbol: symbol.toUpperCase(), assetType });
         return !!item;
     } catch (error) {
         console.error('Error checking watchlist status:', error);
@@ -84,7 +103,8 @@ export async function getWatchlistSymbolsByEmail(email: string): Promise<string[
         const userId = (user.id as string) || String(user._id || '');
         if (!userId) return [];
 
-        const items = await Watchlist.find({ userId }, { symbol: 1 }).lean();
+        // Stock news emails only: crypto symbols are not valid Finnhub tickers.
+        const items = await Watchlist.find({ userId, assetType: 'stock' }, { symbol: 1 }).lean();
         return items.map((i) => String(i.symbol));
     } catch (err) {
         console.error('getWatchlistSymbolsByEmail error:', err);

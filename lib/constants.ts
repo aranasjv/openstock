@@ -1,9 +1,18 @@
 export const NAV_ITEMS = [
     { href: '/', label: 'Dashboard' },
     { href: '/search', label: 'Search' },
+    { href: '/crypto-search', label: 'Crypto Search' },
+    { href: '/crypto', label: 'Crypto' },
     { href: '/watchlist', label: 'Watchlist' },
     { href: '/api-docs', label: 'API Docs' },
 ];
+
+// NAV_ITEMS entries that open a search palette instead of navigating to a route.
+// There are no pages at these paths; NavItems intercepts them.
+export const SEARCH_PALETTE_ITEMS: Record<string, 'stock' | 'crypto'> = {
+    '/search': 'stock',
+    '/crypto-search': 'crypto',
+};
 
 // Sign-up form select options
 export const INVESTMENT_GOALS = [
@@ -262,6 +271,196 @@ export const COMPANY_FINANCIALS_WIDGET_CONFIG = (symbol: string) => ({
     displayMode: 'regular',
     largeChartUrl: '',
 });
+
+// -- Crypto (TradingView widgets + CoinGecko ids) --
+
+export const CRYPTO_MARKET_OVERVIEW_WIDGET_CONFIG = {
+    colorTheme: 'dark',
+    dateRange: '12M',
+    locale: 'en',
+    largeChartUrl: '',
+    isTransparent: true,
+    showFloatingTooltip: true,
+    plotLineColorGrowing: '#0FEDBE',
+    plotLineColorFalling: '#0FEDBE',
+    gridLineColor: 'rgba(240, 243, 250, 0)',
+    scaleFontColor: '#DBDBDB',
+    belowLineFillColorGrowing: 'rgba(41, 98, 255, 0.12)',
+    belowLineFillColorFalling: 'rgba(41, 98, 255, 0.12)',
+    belowLineFillColorGrowingBottom: 'rgba(41, 98, 255, 0)',
+    belowLineFillColorFallingBottom: 'rgba(41, 98, 255, 0)',
+    symbolActiveColor: 'rgba(15, 237, 190, 0.05)',
+    tabs: [
+        {
+            title: 'Layer 1',
+            symbols: [
+                { s: 'BINANCE:BTCUSDT', d: 'Bitcoin' },
+                { s: 'BINANCE:ETHUSDT', d: 'Ethereum' },
+                { s: 'BINANCE:SOLUSDT', d: 'Solana' },
+                { s: 'BINANCE:BNBUSDT', d: 'BNB' },
+                { s: 'BINANCE:ADAUSDT', d: 'Cardano' },
+                { s: 'BINANCE:AVAXUSDT', d: 'Avalanche' },
+            ],
+        },
+        {
+            title: 'Layer 2 & DeFi',
+            symbols: [
+                { s: 'BINANCE:LINKUSDT', d: 'Chainlink' },
+                { s: 'BINANCE:UNIUSDT', d: 'Uniswap' },
+                { s: 'BINANCE:AAVEUSDT', d: 'Aave' },
+                { s: 'BINANCE:MATICUSDT', d: 'Polygon' },
+                { s: 'BINANCE:ATOMUSDT', d: 'Cosmos' },
+                { s: 'BINANCE:DOTUSDT', d: 'Polkadot' },
+            ],
+        },
+        {
+            title: 'Meme & Payments',
+            symbols: [
+                { s: 'BINANCE:DOGEUSDT', d: 'Dogecoin' },
+                { s: 'BINANCE:SHIBUSDT', d: 'Shiba Inu' },
+                { s: 'BINANCE:XRPUSDT', d: 'XRP' },
+                { s: 'BINANCE:LTCUSDT', d: 'Litecoin' },
+                { s: 'BINANCE:TRXUSDT', d: 'TRON' },
+                { s: 'BINANCE:XLMUSDT', d: 'Stellar' },
+            ],
+        },
+    ],
+    support_host: 'https://www.tradingview.com',
+    backgroundColor: '#141414',
+    width: '100%',
+    height: 600,
+    showSymbolLogo: true,
+    showChart: true,
+};
+
+export const CRYPTO_HEATMAP_WIDGET_CONFIG = {
+    dataSource: 'Crypto',
+    blockSize: 'market_cap_calc',
+    blockColor: 'change',
+    grouping: 'no_group',
+    isTransparent: true,
+    locale: 'en',
+    symbolUrl: '',
+    colorTheme: 'dark',
+    exchanges: [],
+    hasTopBar: false,
+    isDataSetEnabled: false,
+    isZoomEnabled: true,
+    hasSymbolTooltip: true,
+    isMonoSize: false,
+    width: '100%',
+    height: '600',
+};
+
+export const CRYPTO_TOP_STORIES_WIDGET_CONFIG = {
+    displayMode: 'regular',
+    feedMode: 'market',
+    colorTheme: 'dark',
+    isTransparent: true,
+    locale: 'en',
+    market: 'crypto',
+    width: '100%',
+    height: '600',
+};
+
+export const CRYPTO_MARKET_DATA_WIDGET_CONFIG = {
+    title: 'Crypto',
+    width: '100%',
+    height: 600,
+    locale: 'en',
+    showSymbolLogo: true,
+    colorTheme: 'dark',
+    isTransparent: false,
+    backgroundColor: '#0F0F0F',
+    symbolsGroups: [
+        {
+            name: 'Layer 1',
+            symbols: [
+                { name: 'BINANCE:BTCUSDT', displayName: 'Bitcoin' },
+                { name: 'BINANCE:ETHUSDT', displayName: 'Ethereum' },
+                { name: 'BINANCE:SOLUSDT', displayName: 'Solana' },
+                { name: 'BINANCE:BNBUSDT', displayName: 'BNB' },
+                { name: 'BINANCE:ADAUSDT', displayName: 'Cardano' },
+                { name: 'BINANCE:AVAXUSDT', displayName: 'Avalanche' },
+            ],
+        },
+        {
+            name: 'DeFi',
+            symbols: [
+                { name: 'BINANCE:LINKUSDT', displayName: 'Chainlink' },
+                { name: 'BINANCE:UNIUSDT', displayName: 'Uniswap' },
+                { name: 'BINANCE:AAVEUSDT', displayName: 'Aave' },
+                { name: 'BINANCE:ATOMUSDT', displayName: 'Cosmos' },
+                { name: 'BINANCE:DOTUSDT', displayName: 'Polkadot' },
+            ],
+        },
+        {
+            name: 'Meme & Payments',
+            symbols: [
+                { name: 'BINANCE:DOGEUSDT', displayName: 'Dogecoin' },
+                { name: 'BINANCE:SHIBUSDT', displayName: 'Shiba Inu' },
+                { name: 'BINANCE:XRPUSDT', displayName: 'XRP' },
+                { name: 'BINANCE:LTCUSDT', displayName: 'Litecoin' },
+                { name: 'BINANCE:TRXUSDT', displayName: 'TRON' },
+            ],
+        },
+    ],
+};
+
+// CoinGecko ids, ordered by market cap. Used for widget symbol lists; the crypto
+// dashboard itself always reads live rankings from the API.
+export const POPULAR_CRYPTO_IDS = [
+    'bitcoin',
+    'ethereum',
+    'tether',
+    'ripple',
+    'binancecoin',
+    'solana',
+    'usd-coin',
+    'dogecoin',
+    'cardano',
+    'tron',
+    'avalanche-2',
+    'shiba-inu',
+    'polkadot',
+    'chainlink',
+    'toncoin',
+    'sui',
+    'stellar',
+    'hedera-hashgraph',
+    'litecoin',
+    'bitcoin-cash',
+    'uniswap',
+    'near',
+    'aptos',
+    'internet-computer',
+    'ethereum-classic',
+    'monero',
+    'filecoin',
+    'cosmos',
+    'arbitrum',
+    'optimism',
+    'injective-protocol',
+    'render-token',
+    'cronos',
+    'algorand',
+    'the-graph',
+    'vechain',
+    'maker',
+    'aave',
+    'theta-token',
+    'axie-infinity',
+    'decentraland',
+    'the-sandbox',
+    'eos',
+    'tezos',
+    'flow',
+    'fantom',
+    'curve-dao-token',
+    'compound-governance-token',
+    'pancakeswap-token',
+    'dogwifcoin',
+];
 
 export const POPULAR_STOCK_SYMBOLS = [
     // Tech Giants (the big technology companies)

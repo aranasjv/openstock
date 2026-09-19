@@ -10,6 +10,7 @@ interface WatchlistButtonProps {
     showTrashIcon?: boolean;
     type?: "button" | "icon";
     userId?: string; // Made optional for backward compat, but required for actions
+    assetType?: AssetType; // Defaults to 'stock'
     onWatchlistChange?: (symbol: string, added: boolean) => void;
 }
 
@@ -20,6 +21,7 @@ const WatchlistButton = ({
     showTrashIcon = false,
     type = "button",
     userId,
+    assetType = "stock",
     onWatchlistChange,
 }: WatchlistButtonProps) => {
     const [added, setAdded] = useState<boolean>(!!isInWatchlist);
@@ -46,10 +48,10 @@ const WatchlistButton = ({
         try {
             if (userId) {
                 if (next) {
-                    await addToWatchlist(userId, symbol, company);
+                    await addToWatchlist(userId, symbol, company, assetType);
                     toast.success(`${symbol} added to watchlist`);
                 } else {
-                    await removeFromWatchlist(userId, symbol);
+                    await removeFromWatchlist(userId, symbol, assetType);
                     toast.success(`${symbol} removed from watchlist`);
                 }
             }

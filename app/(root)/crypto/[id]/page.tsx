@@ -1,24 +1,24 @@
 import TradingViewWidget from "@/components/TradingViewWidget";
 import WatchlistButton from "@/components/WatchlistButton";
-import StockSentimentCard from "@/components/stocks/StockSentimentCard";
+import CryptoAboutCard from "@/components/crypto/CryptoAboutCard";
+import CryptoAlertButton from "@/components/crypto/CryptoAlertButton";
 import {
     SYMBOL_INFO_WIDGET_CONFIG,
     CANDLE_CHART_WIDGET_CONFIG,
     BASELINE_WIDGET_CONFIG,
     TECHNICAL_ANALYSIS_WIDGET_CONFIG,
-    COMPANY_PROFILE_WIDGET_CONFIG,
-    COMPANY_FINANCIALS_WIDGET_CONFIG,
 } from "@/lib/constants";
 
 import { getAuth } from '@/lib/better-auth/auth';
 import { headers } from 'next/headers';
 import { isStockInWatchlist } from '@/lib/actions/watchlist.actions';
-import { getStockSentimentInsights } from '@/lib/actions/adanos.actions';
-import { formatSymbolForTradingView } from '@/lib/utils';
+import { getCryptoCoinDetail } from '@/lib/actions/crypto.actions';
+import { formatCryptoSymbolForTradingView } from '@/lib/utils';
 
-export default async function StockDetails({ params }: StockDetailsPageProps) {
-    const { symbol } = await params;
-    const tvSymbol = formatSymbolForTradingView(symbol);
+export default async function CryptoDetails({ params }: CryptoDetailsPageProps) {
+    const { id } = await params;
+    const coinId = id.toLowerCase();
+    const tvSymbol = formatCryptoSymbolForTradingView(coinId);
     const scriptUrl = `https://s3.tradingview.com/external-embedding/embed-widget-`;
 
     const auth = await getAuth();
@@ -26,9 +26,10 @@ export default async function StockDetails({ params }: StockDetailsPageProps) {
         headers: await headers()
     });
     const userId = session?.user?.id;
-    const [isInWatchlist, sentimentInsights] = await Promise.all([
-        userId ? isStockInWatchlist(userId, symbol) : Promise.resolve(false),
-        getStockSentimentInsights(symbol),
+
+    const [isInWatchlist, coin] = await Promise.all([
+        userId ? isStockInWatchlist(userId, coinId, 'crypto') : Promise.resolve(false),
+        getCryptoCoinDetail(coinId),
     ]);
 
     return (
@@ -61,33 +62,36 @@ export default async function StockDetails({ params }: StockDetailsPageProps) {
 
                 {/* Right column */}
                 <div className="flex flex-col gap-6">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-3">
                         <WatchlistButton
-                            symbol={symbol.toUpperCase()}
-                            company={symbol.toUpperCase()}
+                            symbol={coinId}
+                            company={coin?.name ?? coinId}
                             isInWatchlist={isInWatchlist}
                             userId={userId}
+                            assetType="crypto"
                         />
+                        {userId ? (
+                            <CryptoAlertButton
+                                userId={userId}
+                                coinId={coinId}
+                                coinName={coin?.name ?? coinId}
+                                currentPrice={coin?.currentPrice ?? 0}
+                            />
+                        ) : null}
                     </div>
 
-                    <StockSentimentCard insight={sentimentInsights} />
+                    {coin ? (
+                        <CryptoAboutCard coin={coin} />
+                    ) : (
+                        <div className="rounded-xl border border-gray-800 bg-gray-900/30 p-5 text-sm text-gray-500">
+                            Coin details are unavailable right now.
+                        </div>
+                    )}
 
                     <TradingViewWidget
                         scriptUrl={`${scriptUrl}technical-analysis.js`}
                         config={TECHNICAL_ANALYSIS_WIDGET_CONFIG(tvSymbol)}
                         height={400}
-                    />
-
-                    <TradingViewWidget
-                        scriptUrl={`${scriptUrl}company-profile.js`}
-                        config={COMPANY_PROFILE_WIDGET_CONFIG(tvSymbol)}
-                        height={440}
-                    />
-
-                    <TradingViewWidget
-                        scriptUrl={`${scriptUrl}financials.js`}
-                        config={COMPANY_FINANCIALS_WIDGET_CONFIG(tvSymbol)}
-                        height={800}
                     />
                 </div>
             </section>

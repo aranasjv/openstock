@@ -2,10 +2,11 @@
 
 
 import React, { createContext, useContext } from 'react'
-import {NAV_ITEMS} from "@/lib/constants";
+import {NAV_ITEMS, SEARCH_PALETTE_ITEMS} from "@/lib/constants";
 import Link from "next/link";
 import {usePathname} from "next/navigation";
 import SearchCommand from "@/components/SearchCommand";
+import CryptoSearchCommand from "@/components/crypto/CryptoSearchCommand";
 import { Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -18,7 +19,13 @@ const DonatePopupContext = createContext<{
 
 export const useDonatePopup = () => useContext(DonatePopupContext);
 
-const NavItems = ({initialStocks}: { initialStocks: StockWithWatchlistStatus[]}) => {
+const NavItems = ({
+    initialStocks,
+    initialCoins,
+}: {
+    initialStocks: StockWithWatchlistStatus[];
+    initialCoins: CryptoCoinWithWatchlistStatus[];
+}) => {
     const pathname = usePathname()
 
     const isActive = (path: string) => {
@@ -36,12 +43,22 @@ const NavItems = ({initialStocks}: { initialStocks: StockWithWatchlistStatus[]})
         <DonatePopupContext.Provider value={{ openDonatePopup }}>
             <ul className="flex flex-col sm:flex-row p-2 gap-3 sm:gap-10 font-medium">
             {NAV_ITEMS.map(({href, label}) => {
-                if (href === '/search') return (
+                const palette = SEARCH_PALETTE_ITEMS[href];
+                if (palette === 'stock') return (
                     <li key="search-trigger">
                         <SearchCommand
                             renderAs="text"
                             label="Search"
                             initialStocks={initialStocks}
+                        />
+                    </li>
+                )
+                if (palette === 'crypto') return (
+                    <li key="crypto-search-trigger">
+                        <CryptoSearchCommand
+                            renderAs="text"
+                            label="Crypto Search"
+                            initialCoins={initialCoins}
                         />
                     </li>
                 )

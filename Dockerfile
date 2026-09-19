@@ -1,31 +1,39 @@
-# Use official Node.js 20 Alpine image as base
-FROM node:20-alpine
-
-# Set working directory
+# --- deps: install with the lockfile so builds are reproducible ---
+FROM node:20-alpine AS deps
 WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
 
-# Copy package.json and package-lock.json to leverage Docker cache
-COPY package*.json ./
-# Uncomment the next line if you use pnpm and have pnpm-lock.yaml
-# COPY pnpm-lock.yaml ./
-
-# Install dependencies (choose npm or pnpm)
-RUN npm install
-# If using pnpm, replace with:
-# RUN npm install -g pnpm && pnpm install
-
-# Copy all project files
+# --- builder ---
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Build the Next.js application
-RUN npm run build
-# Or if using pnpm:
-# RUN pnpm run build
+# NEXT_PUBLIC_* values are inlined into the client bundle at compile time, so they must
+# be present during the build. Server-only secrets (COINGECKO_API_KEY, BETTER_AUTH_SECRET,
+# MONGODB_URI) are intentionally NOT build args — they are read at runtime.
+ARG NEXT_PUBLIC_FINNHUB_API_KEY
+ENV NEXT_PUBLIC_FINNHUB_API_KEY=$NEXT_PUBLIC_FINNHUB_API_KEY
 
-# Expose the port Next.js runs on
+RUN npm run build
+
+# --- runner: slim image running the standalone server as a non-root user ---
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+
+RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
+
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+USER nextjs
+
 EXPOSE 3000
 
-# Start the Next.js production server
-CMD ["npm", "start"]
-# Or if using pnpm:
-# CMD ["pnpm", "start"]
+CMD ["node", "server.js"]
