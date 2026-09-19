@@ -2,6 +2,8 @@
 
 import { cache } from 'react';
 import { POPULAR_CRYPTO_IDS } from '@/lib/constants';
+import { loadConfig } from '@/lib/config';
+import type { Candle } from '@/lib/indicators';
 
 /**
  * CoinGecko data layer.
@@ -14,11 +16,7 @@ import { POPULAR_CRYPTO_IDS } from '@/lib/constants';
  *   limit or outage never takes down a page.
  */
 
-const COINGECKO_BASE_URL = (
-    process.env.COINGECKO_API_BASE_URL || 'https://api.coingecko.com/api/v3'
-).replace(/\/$/, '');
-
-const COINGECKO_API_KEY = process.env.COINGECKO_API_KEY || '';
+const DEFAULT_COINGECKO_BASE_URL = 'https://api.coingecko.com/api/v3';
 
 const REQUEST_TIMEOUT_MS = 8000;
 
@@ -41,6 +39,10 @@ type RawCoinMarket = {
 };
 
 async function fetchCoinGecko<T>(path: string, revalidateSeconds?: number): Promise<T | null> {
+    const config = await loadConfig();
+    const baseUrl = (config.COINGECKO_API_BASE_URL || DEFAULT_COINGECKO_BASE_URL).replace(/\/$/, '');
+    const apiKey = config.COINGECKO_API_KEY || '';
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
@@ -48,12 +50,12 @@ async function fetchCoinGecko<T>(path: string, revalidateSeconds?: number): Prom
         ? { cache: 'force-cache', next: { revalidate: revalidateSeconds }, signal: controller.signal }
         : { cache: 'no-store', signal: controller.signal };
 
-    if (COINGECKO_API_KEY) {
-        options.headers = { 'x-cg-demo-api-key': COINGECKO_API_KEY };
+    if (apiKey) {
+        options.headers = { 'x-cg-demo-api-key': apiKey };
     }
 
     try {
-        const res = await fetch(`${COINGECKO_BASE_URL}${path}`, options);
+        const res = await fetch(`${baseUrl}${path}`, options);
 
         if (!res.ok) {
             console.error(`CoinGecko ${res.status} for ${path}`);
@@ -223,6 +225,39 @@ export const searchCrypto = cache(async (query?: string): Promise<CryptoCoinWith
         isInWatchlist: false,
     }));
 });
+
+/**
+ * Daily close/volume history for one coin, used by the screener.
+ *
+ * CoinGecko's market_chart returns close prices and volumes but not OHLC, so
+ * open/high/low are filled from the close. Every indicator the screener uses is derived
+ * from closes and volumes, so nothing is lost.
+ */
+export async function getCryptoPriceHistory(coinId: string): Promise<Candle[] | null> {
+    if (!coinId) return null;
+
+    const raw = await fetchCoinGecko<{
+        prices?: [number, number][];
+        total_volumes?: [number, number][];
+    }>(`/coins/${encodeURIComponent(coinId.toLowerCase())}/market_chart?vs_currency=usd&days=200&interval=daily`, 3600);
+
+    if (!raw?.prices || !Array.isArray(raw.prices)) return null;
+
+    const volumesByTimestamp = new Map<number, number>(
+        (raw.total_volumes ?? []).map(([ts, volume]) => [ts, volume])
+    );
+
+    return raw.prices
+        .filter((entry): entry is [number, number] => Array.isArray(entry) && Number.isFinite(entry[1]))
+        .map(([ts, price]) => ({
+            t: Math.floor(ts / 1000),
+            o: price,
+            h: price,
+            l: price,
+            c: price,
+            v: volumesByTimestamp.get(ts) ?? 0,
+        }));
+}
 
 /**
  * Crypto news.

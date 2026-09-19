@@ -2,6 +2,7 @@
 
 import { getAuth } from "@/lib/better-auth/auth";
 import { inngest } from "@/lib/inngest/client";
+import { loadConfig } from "@/lib/config";
 import { headers } from "next/headers";
 
 export const signUpWithEmail = async ({ email, password, fullName, country, investmentGoals, riskTolerance, preferredIndustry }: SignUpFormData) => {
@@ -61,7 +62,8 @@ export const signInWithEmail = async ({ email, password }: SignInFormData) => {
 }
 
 export const requestPasswordResetEmail = async ({ email }: { email: string }) => {
-    if (!process.env.NODEMAILER_EMAIL || !process.env.NODEMAILER_PASSWORD) {
+    const { NODEMAILER_EMAIL, NODEMAILER_PASSWORD } = await loadConfig();
+    if (!NODEMAILER_EMAIL || !NODEMAILER_PASSWORD) {
         return { success: false, error: 'Password reset email is not configured.' }
     }
 

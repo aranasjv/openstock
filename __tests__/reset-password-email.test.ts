@@ -1,17 +1,40 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+// The transporter is now built lazily, so the mock exposes getTransporter() rather than a
+// ready-made instance. vi.hoisted keeps the spy available to the hoisted mock factory.
+const { sendMailMock } = vi.hoisted(() => ({ sendMailMock: vi.fn() }));
+
 vi.mock('@/lib/nodemailer', () => ({
-    transporter: {
-        sendMail: vi.fn(),
-    },
+    getTransporter: async () => ({ sendMail: sendMailMock }),
 }));
 
-import { transporter } from '@/lib/nodemailer';
+// Read config straight from process.env so these tests never touch MongoDB or real saved
+// settings. Built from the real schema so key names and defaults cannot drift.
+vi.mock('@/lib/config', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('@/lib/config')>();
+    return {
+        ...actual,
+        loadConfig: async () => {
+            const values: Record<string, string> = {};
+            for (const def of actual.CONFIG_SCHEMA) {
+                let value: string | undefined;
+                for (const name of def.env ?? []) {
+                    if (process.env[name]) {
+                        value = process.env[name];
+                        break;
+                    }
+                }
+                values[def.key] = value ?? def.default ?? '';
+            }
+            return values;
+        },
+    };
+});
+
 import { sendPasswordResetEmail } from '@/lib/nodemailer/reset-password';
 
 describe('sendPasswordResetEmail', () => {
     const originalEnv = { ...process.env };
-    const sendMailMock = vi.mocked(transporter.sendMail);
 
     beforeEach(() => {
         process.env = {

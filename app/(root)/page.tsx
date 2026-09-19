@@ -1,4 +1,5 @@
 import TradingViewWidget from "@/components/TradingViewWidget";
+import MustBuySection from "@/components/screener/MustBuySection";
 import {
     HEATMAP_WIDGET_CONFIG,
     MARKET_DATA_WIDGET_CONFIG,
@@ -6,7 +7,12 @@ import {
     TOP_STORIES_WIDGET_CONFIG
 } from "@/lib/constants";
 
-const Home = () => {
+interface HomeProps {
+    searchParams: Promise<{ strategy?: string }>;
+}
+
+const Home = async ({ searchParams }: HomeProps) => {
+    const { strategy } = await searchParams;
     const scriptUrl = `https://s3.tradingview.com/external-embedding/embed-widget-`;
 
     return (
@@ -47,6 +53,8 @@ const Home = () => {
                 </div>
 
             </section>
+
+            <MustBuySection assetType="stock" strategyId={strategy} />
         </div>
     )
 }

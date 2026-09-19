@@ -1,4 +1,5 @@
-import { transporter } from "@/lib/nodemailer";
+import { getTransporter } from "@/lib/nodemailer";
+import { loadConfig } from "@/lib/config";
 
 const escapeHtml = (value: string) =>
     value
@@ -12,8 +13,14 @@ export const sendPasswordResetEmail = async (
     { email, name, resetUrl }: { email: string; name?: string | null; resetUrl: string }
 ) => {
     try {
-        if (!process.env.NODEMAILER_EMAIL || !process.env.NODEMAILER_PASSWORD) {
+        const { NODEMAILER_EMAIL, NODEMAILER_PASSWORD } = await loadConfig();
+        if (!NODEMAILER_EMAIL || !NODEMAILER_PASSWORD) {
             throw new Error('Email credentials not configured');
+        }
+
+        const transporter = await getTransporter();
+        if (!transporter) {
+            throw new Error('Email transporter unavailable');
         }
 
         const firstName = name?.trim().split(' ')[0] || 'there';
@@ -41,7 +48,7 @@ export const sendPasswordResetEmail = async (
         `;
 
         const info = await transporter.sendMail({
-            from: `"Openstock" <${process.env.NODEMAILER_EMAIL}>`,
+            from: `"Openstock" <${NODEMAILER_EMAIL}>`,
             to: email,
             subject: 'Reset your Openstock password',
             text: `Reset your password: ${encodeURI(resetUrl)}`,

@@ -4,6 +4,7 @@ export const NAV_ITEMS = [
     { href: '/crypto-search', label: 'Crypto Search' },
     { href: '/crypto', label: 'Crypto' },
     { href: '/watchlist', label: 'Watchlist' },
+    { href: '/settings', label: 'Settings' },
     { href: '/api-docs', label: 'API Docs' },
 ];
 

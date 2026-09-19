@@ -19,6 +19,8 @@ services:
       FINNHUB_BASE_URL: ${FINNHUB_BASE_URL:-https://finnhub.io/api/v1}
       # Server-only; read at runtime, never bundled into the client.
       COINGECKO_API_KEY: ${COINGECKO_API_KEY:-}
+      # Gates the /settings page. When unset, the earliest-registered user is the admin.
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
     restart: unless-stopped
     depends_on:
       mongodb:

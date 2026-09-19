@@ -1,0 +1,310 @@
+'use server';
+
+import { POPULAR_STOCK_SYMBOLS } from '@/lib/constants';
+import { loadConfig, getConfigNumber } from '@/lib/config';
+import { computeIndicators, type Candle } from '@/lib/indicators';
+import {
+    runStrategy,
+    STRATEGIES,
+    isStrategyId,
+    DEFAULT_STRATEGY_ID,
+    type Criterion,
+    type StrategyId,
+} from '@/lib/strategies';
+import { getCryptoMarkets, getCryptoPriceHistory } from '@/lib/actions/crypto.actions';
+import type { AIProviderName } from '@/lib/ai-provider';
+
+/**
+ * The "Must Buy" screener.
+ *
+ * Two data paths with very different reliability:
+ *   - Crypto  -> CoinGecko market_chart. Official, free, stable.
+ *   - Stocks  -> Yahoo Finance's unofficial chart endpoint. Finnhub's candle endpoint
+ *                requires a paid plan and Stooq is now behind a JS challenge, so this is
+ *                the only free OHLCV source left. It is treated as unreliable: any
+ *                failure marks that symbol unavailable instead of failing the page.
+ */
+
+const DEFAULT_YAHOO_CHART_BASE = 'https://query1.finance.yahoo.com/v8/finance/chart';
+const REQUEST_TIMEOUT_MS = 10_000;
+const CONCURRENCY = 4;
+
+export interface ScreenerCandidate {
+    /** Route key: CoinGecko id for crypto, ticker for stocks. */
+    symbol: string;
+    name: string;
+    price: number;
+    changePercent24h: number | null;
+    score: number;
+    tier: 'Strong' | 'Moderate' | 'Watch';
+    passed: Criterion[];
+    failed: Criterion[];
+    matched: number;
+    total: number;
+}
+
+export interface ScreenerResult {
+    strategyId: StrategyId;
+    strategies: { id: StrategyId; name: string; summary: string }[];
+    candidates: ScreenerCandidate[];
+    scanned: number;
+    unavailable: number;
+    /** True when at least one data source failed, so the UI can say results are partial. */
+    degraded: boolean;
+    /** Set when nothing could be analysed at all (e.g. the stock feed is down). */
+    unavailableReason?: string;
+}
+
+/** Fetch daily candles from Yahoo's unofficial chart endpoint. */
+async function getStockPriceHistory(symbol: string): Promise<Candle[] | null> {
+    const config = await loadConfig();
+    const baseUrl = (config.YAHOO_CHART_BASE_URL || DEFAULT_YAHOO_CHART_BASE).replace(/\/$/, '');
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    try {
+        const res = await fetch(
+            `${baseUrl}/${encodeURIComponent(symbol)}?range=1y&interval=1d`,
+            {
+                headers: {
+                    // Yahoo rejects requests without a browser-like agent.
+                    'user-agent': 'Mozilla/5.0 (compatible; OpenStock/1.0)',
+                    accept: 'application/json',
+                },
+                next: { revalidate: 3600 },
+                signal: controller.signal,
+            }
+        );
+
+        if (!res.ok) {
+            console.error(`Yahoo chart ${res.status} for ${symbol}`);
+            return null;
+        }
+
+        const data = await res.json();
+        const result = data?.chart?.result?.[0];
+        const timestamps: number[] | undefined = result?.timestamp;
+        const quote = result?.indicators?.quote?.[0];
+
+        if (!timestamps || !quote?.close) return null;
+
+        const candles: Candle[] = [];
+        for (let i = 0; i < timestamps.length; i++) {
+            const close = quote.close[i];
+            // Yahoo emits nulls for halted or partial sessions.
+            if (!Number.isFinite(close)) continue;
+
+            candles.push({
+                t: timestamps[i],
+                o: Number.isFinite(quote.open?.[i]) ? quote.open[i] : close,
+                h: Number.isFinite(quote.high?.[i]) ? quote.high[i] : close,
+                l: Number.isFinite(quote.low?.[i]) ? quote.low[i] : close,
+                c: close,
+                v: Number.isFinite(quote.volume?.[i]) ? quote.volume[i] : 0,
+            });
+        }
+
+        return candles.length > 0 ? candles : null;
+    } catch (error) {
+        console.error(`Yahoo chart request failed for ${symbol}:`, error);
+        return null;
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+/** Run async work over items with a bounded number of concurrent tasks. */
+async function mapWithConcurrency<T, R>(
+    items: T[],
+    limit: number,
+    worker: (item: T) => Promise<R>
+): Promise<R[]> {
+    const results: R[] = new Array(items.length);
+    let cursor = 0;
+
+    const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+        while (cursor < items.length) {
+            const index = cursor++;
+            results[index] = await worker(items[index]);
+        }
+    });
+
+    await Promise.all(runners);
+    return results;
+}
+
+async function getStockName(symbol: string): Promise<string> {
+    // The screener only needs a display label; the ticker is a fine fallback if the
+    // profile lookup fails.
+    try {
+        const { getCompanyProfile } = await import('@/lib/actions/finnhub.actions');
+        const profile = await getCompanyProfile(symbol);
+        return profile?.name || symbol;
+    } catch {
+        return symbol;
+    }
+}
+
+export async function runScreener(
+    assetType: 'stock' | 'crypto',
+    strategyIdInput?: string
+): Promise<ScreenerResult> {
+    const strategyId: StrategyId = isStrategyId(strategyIdInput) ? strategyIdInput : DEFAULT_STRATEGY_ID;
+
+    const strategies = STRATEGIES.map(({ id, name, summary }) => ({ id, name, summary }));
+
+    const universeSize = await getConfigNumber('SCREENER_UNIVERSE_SIZE', 12);
+
+    // Build the universe: crypto by market cap, stocks from the curated popular list.
+    const universe: { symbol: string; name: string; price: number; changePercent24h: number | null }[] = [];
+
+    if (assetType === 'crypto') {
+        const markets = await getCryptoMarkets(Math.min(universeSize, 50));
+        for (const coin of markets.slice(0, universeSize)) {
+            universe.push({
+                symbol: coin.id,
+                name: `${coin.name} (${coin.symbol})`,
+                price: coin.currentPrice,
+                changePercent24h: coin.changePercent24h,
+            });
+        }
+    } else {
+        for (const symbol of POPULAR_STOCK_SYMBOLS.slice(0, universeSize)) {
+            universe.push({ symbol, name: symbol, price: 0, changePercent24h: null });
+        }
+    }
+
+    if (universe.length === 0) {
+        return {
+            strategyId,
+            strategies,
+            candidates: [],
+            scanned: 0,
+            unavailable: 0,
+            degraded: true,
+            unavailableReason: 'The market data provider returned no instruments.',
+        };
+    }
+
+    const analyses = await mapWithConcurrency(universe, CONCURRENCY, async (entry) => {
+        try {
+            const candles =
+                assetType === 'crypto'
+                    ? await getCryptoPriceHistory(entry.symbol)
+                    : await getStockPriceHistory(entry.symbol);
+
+            if (!candles) return null;
+
+            const bundle = computeIndicators(candles);
+            if (!bundle) return null;
+
+            const result = runStrategy(bundle, strategyId);
+
+            const name =
+                assetType === 'crypto' ? entry.name : await getStockName(entry.symbol);
+
+            const candidate: ScreenerCandidate = {
+                symbol: entry.symbol,
+                name,
+                price: bundle.price,
+                changePercent24h: entry.changePercent24h,
+                score: result.score,
+                tier: result.tier,
+                passed: result.passed,
+                failed: result.failed,
+                matched: result.matched,
+                total: result.total,
+            };
+            return candidate;
+        } catch (error) {
+            console.error(`Screener failed for ${entry.symbol}:`, error);
+            return null;
+        }
+    });
+
+    const candidates = analyses.filter((item): item is ScreenerCandidate => item !== null);
+    const unavailable = universe.length - candidates.length;
+
+    // Rank by score, then by how many of the strategy's own conditions matched, so ties
+    // prefer assets that satisfied the strategy rather than just the raw percentage.
+    candidates.sort((a, b) => b.score - a.score || b.matched - a.matched);
+
+    return {
+        strategyId,
+        strategies,
+        candidates,
+        scanned: universe.length,
+        unavailable,
+        degraded: unavailable > 0,
+        unavailableReason:
+            candidates.length === 0
+                ? assetType === 'stock'
+                    ? 'Stock history is unavailable. The free OHLCV source used here is unofficial and may be blocked or rate limited.'
+                    : 'Crypto history is unavailable right now.'
+                : undefined,
+    };
+}
+
+/** Strategy metadata for the dropdown. */
+export async function getStrategiesForUi(): Promise<
+    { id: StrategyId; name: string; summary: string }[]
+> {
+    return STRATEGIES.map(({ id, name, summary }) => ({ id, name, summary }));
+}
+
+/**
+ * AI rationale for one candidate, generated on demand rather than for every row on every
+ * page load — each call costs credit.
+ */
+export async function explainCandidate(
+    assetType: 'stock' | 'crypto',
+    symbol: string,
+    strategyIdInput: string
+): Promise<{ ok: boolean; text?: string; error?: string }> {
+    const strategyId: StrategyId = isStrategyId(strategyIdInput) ? strategyIdInput : DEFAULT_STRATEGY_ID;
+
+    try {
+        const candles =
+            assetType === 'crypto'
+                ? await getCryptoPriceHistory(symbol)
+                : await getStockPriceHistory(symbol);
+
+        if (!candles) return { ok: false, error: 'No price history available for this asset.' };
+
+        const bundle = computeIndicators(candles);
+        if (!bundle) return { ok: false, error: 'Not enough history to analyse this asset.' };
+
+        const result = runStrategy(bundle, strategyId);
+        const strategy = STRATEGIES.find((s) => s.id === strategyId) ?? STRATEGIES[0];
+
+        const prompt = [
+            `You are explaining a rule-based technical screen to a retail investor. Be concise (max 90 words).`,
+            `Do not give investment advice, price targets, or a buy/sell recommendation.`,
+            `Explain what the conditions below mean for this asset and note the main risk of this setup.`,
+            ``,
+            `Asset: ${symbol} (${assetType})`,
+            `Strategy: ${strategy.name} — ${strategy.summary}`,
+            `Measured conditions met: ${result.matched} of ${result.total}`,
+            ...result.passed.map((c) => `  MET: ${c.label} (${c.detail})`),
+            ...result.failed.map((c) => `  NOT MET: ${c.label} (${c.detail})`),
+            `Other context: 30-day change ${bundle.change30d?.toFixed(1) ?? 'n/a'}%, max drawdown ${bundle.maxDrawdown?.toFixed(1) ?? 'n/a'}%, annualised-ish volatility ${bundle.volatility?.toFixed(1) ?? 'n/a'}%.`,
+            ``,
+            `Start with a single sentence summarising the setup, then one sentence on the main risk.`,
+        ].join('\n');
+
+        const config = await loadConfig();
+        const providerName = (config.AI_PROVIDER || 'gemini') as AIProviderName;
+
+        const { callAIProvider } = await import('@/lib/ai-provider');
+        const text = await callAIProvider(prompt, providerName);
+
+        return { ok: true, text: text.trim() };
+    } catch (error) {
+        console.error('explainCandidate failed:', error);
+        return {
+            ok: false,
+            error: error instanceof Error ? error.message : 'Could not generate an explanation.',
+        };
+    }
+}

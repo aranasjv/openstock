@@ -1,42 +1,52 @@
-import nodemailer from 'nodemailer';
+import nodemailer, { type Transporter } from 'nodemailer';
+import { loadConfig } from '@/lib/config';
 import { WELCOME_EMAIL_TEMPLATE, NEWS_SUMMARY_EMAIL_TEMPLATE } from "@/lib/nodemailer/templates";
 
 type EmailSendResult =
     | { status: 'skipped' }
     | { status: 'sent'; messageId: string };
 
-const hasEmailConfig = Boolean(process.env.NODEMAILER_EMAIL && process.env.NODEMAILER_PASSWORD);
+/**
+ * The transporter is built lazily rather than at import time, because credentials now come
+ * from the runtime config layer and can change from /settings. It is rebuilt whenever the
+ * configured credentials change, so editing a Gmail app password takes effect immediately.
+ */
+let cachedTransporter: Transporter | null = null;
+let cachedCredentialKey = '';
 
-if (!hasEmailConfig) {
-    console.warn('⚠️ Email credentials are not configured. Welcome and news summary emails are disabled until NODEMAILER_EMAIL and NODEMAILER_PASSWORD are set.');
-}
+export async function getTransporter(): Promise<Transporter | null> {
+    const { NODEMAILER_EMAIL, NODEMAILER_PASSWORD } = await loadConfig();
 
-export const transporter = hasEmailConfig
-    ? nodemailer.createTransport({
+    if (!NODEMAILER_EMAIL || !NODEMAILER_PASSWORD) {
+        return null;
+    }
+
+    const credentialKey = `${NODEMAILER_EMAIL}:${NODEMAILER_PASSWORD}`;
+    if (cachedTransporter && cachedCredentialKey === credentialKey) {
+        return cachedTransporter;
+    }
+
+    cachedTransporter = nodemailer.createTransport({
         service: 'gmail',
         auth: {
-            user: process.env.NODEMAILER_EMAIL!,
-            pass: process.env.NODEMAILER_PASSWORD!,
+            user: NODEMAILER_EMAIL,
+            pass: NODEMAILER_PASSWORD,
         },
         // Keep the pool small because email volume is low in this app.
         pool: true,
         maxConnections: 1,
         maxMessages: 3,
-    })
-    : null;
-
-if (transporter) {
-    transporter.verify((error) => {
-        if (error) {
-            console.error('❌ Nodemailer transporter verification failed:', error);
-        } else {
-            console.log('✅ Nodemailer transporter is ready to send emails');
-        }
     });
+    cachedCredentialKey = credentialKey;
+
+    return cachedTransporter;
 }
 
-export const sendWelcomeEmail = async ({ email, name, intro }: WelcomeEmailData) => {
+export async function sendWelcomeEmail({ email, name, intro }: WelcomeEmailData) {
     try {
+        const { NODEMAILER_EMAIL } = await loadConfig();
+        const transporter = await getTransporter();
+
         if (!transporter) {
             console.warn('⚠️ Welcome email skipped: email credentials are not configured.');
             return { status: 'skipped' } satisfies EmailSendResult;
@@ -47,7 +57,7 @@ export const sendWelcomeEmail = async ({ email, name, intro }: WelcomeEmailData)
             .replace('{{intro}}', intro);
 
         const mailOptions = {
-            from: `"Openstock" <${process.env.NODEMAILER_EMAIL}>`,
+            from: `"Openstock" <${NODEMAILER_EMAIL}>`,
             to: email,
             subject: `Welcome to Openstock - your open-source stock market toolkit!`,
             text: 'Thanks for joining Openstock, an initiative by open dev society',
@@ -67,6 +77,9 @@ export const sendNewsSummaryEmail = async (
     { email, date, newsContent }: { email: string; date: string; newsContent: string }
 ) => {
     try {
+        const { NODEMAILER_EMAIL } = await loadConfig();
+        const transporter = await getTransporter();
+
         if (!transporter) {
             console.warn('⚠️ News summary email skipped: email credentials are not configured.');
             return { status: 'skipped' } satisfies EmailSendResult;
@@ -77,7 +90,7 @@ export const sendNewsSummaryEmail = async (
             .replace('{{newsContent}}', newsContent);
 
         const mailOptions = {
-            from: `"Openstock" <${process.env.NODEMAILER_EMAIL}>`,
+            from: `"Openstock" <${NODEMAILER_EMAIL}>`,
             to: email,
             subject: `📈 Market News Summary Today - ${date}`,
             text: `Today's market news summary from Openstock`,

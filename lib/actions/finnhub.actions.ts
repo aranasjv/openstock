@@ -2,10 +2,23 @@
 
 import { getDateRange, validateArticle, formatArticle } from '@/lib/utils';
 import { POPULAR_STOCK_SYMBOLS } from '@/lib/constants';
+import { loadConfig } from '@/lib/config';
 import { cache } from 'react';
 
-const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
-const NEXT_PUBLIC_FINNHUB_API_KEY = process.env.NEXT_PUBLIC_FINNHUB_API_KEY ?? '';
+const DEFAULT_FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
+
+/**
+ * Credentials are read per call rather than captured at module scope, so a key set from
+ * /settings takes effect without a rebuild. `NEXT_PUBLIC_FINNHUB_API_KEY` is still
+ * honoured as an env fallback by the config schema.
+ */
+async function getFinnhubConfig(): Promise<{ token: string; baseUrl: string }> {
+    const config = await loadConfig();
+    return {
+        token: config.FINNHUB_API_KEY ?? '',
+        baseUrl: (config.FINNHUB_BASE_URL || DEFAULT_FINNHUB_BASE_URL).replace(/\/$/, ''),
+    };
+}
 
 type FinnhubQuote = {
     c?: number;
@@ -65,8 +78,8 @@ function getExchangeLabel(symbol: string, exchange?: string) {
 
 export async function getQuote(symbol: string) {
     try {
-        const token = NEXT_PUBLIC_FINNHUB_API_KEY;
-        const url = `${FINNHUB_BASE_URL}/quote?symbol=${encodeURIComponent(symbol)}&token=${token}`;
+        const { token, baseUrl } = await getFinnhubConfig();
+        const url = `${baseUrl}/quote?symbol=${encodeURIComponent(symbol)}&token=${token}`;
         // No caching for real-time price
         return await fetchJSON<FinnhubQuote>(url, 0);
     } catch (e) {
@@ -77,8 +90,8 @@ export async function getQuote(symbol: string) {
 
 export async function getCompanyProfile(symbol: string) {
     try {
-        const token = NEXT_PUBLIC_FINNHUB_API_KEY;
-        const url = `${FINNHUB_BASE_URL}/stock/profile2?symbol=${encodeURIComponent(symbol)}&token=${token}`;
+        const { token, baseUrl } = await getFinnhubConfig();
+        const url = `${baseUrl}/stock/profile2?symbol=${encodeURIComponent(symbol)}&token=${token}`;
         // Cache profile for 24 hours
         return await fetchJSON<FinnhubCompanyProfile>(url, 86400);
     } catch (e) {
@@ -117,7 +130,7 @@ export async function getWatchlistData(symbols: string[]) {
 export async function getNews(symbols?: string[]): Promise<MarketNewsArticle[]> {
     try {
         const range = getDateRange(5);
-        const token = NEXT_PUBLIC_FINNHUB_API_KEY;
+        const { token, baseUrl } = await getFinnhubConfig();
         if (!token) {
             throw new Error('FINNHUB API key is not configured');
         }
@@ -134,7 +147,7 @@ export async function getNews(symbols?: string[]): Promise<MarketNewsArticle[]> 
             await Promise.all(
                 cleanSymbols.map(async (sym) => {
                     try {
-                        const url = `${FINNHUB_BASE_URL}/company-news?symbol=${encodeURIComponent(sym)}&from=${range.from}&to=${range.to}&token=${token}`;
+                        const url = `${baseUrl}/company-news?symbol=${encodeURIComponent(sym)}&from=${range.from}&to=${range.to}&token=${token}`;
                         const articles = await fetchJSON<RawNewsArticle[]>(url, 300);
                         perSymbolArticles[sym] = (articles || []).filter(validateArticle);
                     } catch (e) {
@@ -168,7 +181,7 @@ export async function getNews(symbols?: string[]): Promise<MarketNewsArticle[]> 
         }
 
         // General market news fallback or when no symbols provided
-        const generalUrl = `${FINNHUB_BASE_URL}/news?category=general&token=${token}`;
+        const generalUrl = `${baseUrl}/news?category=general&token=${token}`;
         const general = await fetchJSON<RawNewsArticle[]>(generalUrl, 300);
 
         const seen = new Set<string>();
@@ -192,7 +205,7 @@ export async function getNews(symbols?: string[]): Promise<MarketNewsArticle[]> 
 
 export const searchStocks = cache(async (query?: string): Promise<StockWithWatchlistStatus[]> => {
     try {
-        const token = NEXT_PUBLIC_FINNHUB_API_KEY;
+        const { token, baseUrl } = await getFinnhubConfig();
         if (!token) {
             // If no token, log and return empty to avoid throwing per requirements
             console.error('Error in stock search:', new Error('FINNHUB API key is not configured'));
@@ -209,7 +222,7 @@ export const searchStocks = cache(async (query?: string): Promise<StockWithWatch
             const profiles = await Promise.all(
                 top.map(async (sym) => {
                     try {
-                        const url = `${FINNHUB_BASE_URL}/stock/profile2?symbol=${encodeURIComponent(sym)}&token=${token}`;
+                        const url = `${baseUrl}/stock/profile2?symbol=${encodeURIComponent(sym)}&token=${token}`;
                         // Revalidate every hour
                         const profile = await fetchJSON<FinnhubCompanyProfile>(url, 3600);
                         return { sym, profile } as { sym: string; profile: FinnhubCompanyProfile | null };
@@ -237,7 +250,7 @@ export const searchStocks = cache(async (query?: string): Promise<StockWithWatch
                 })
                 .filter((x): x is SearchStockCandidate => Boolean(x));
         } else {
-            const url = `${FINNHUB_BASE_URL}/search?q=${encodeURIComponent(trimmed)}&token=${token}`;
+            const url = `${baseUrl}/search?q=${encodeURIComponent(trimmed)}&token=${token}`;
             const data = await fetchJSON<FinnhubSearchResponse>(url, 1800);
             results = Array.isArray(data?.result) ? data.result : [];
         }

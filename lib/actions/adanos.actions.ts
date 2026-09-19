@@ -9,16 +9,19 @@ import {
     type SourceComparePayload,
     type StockSentimentInsights,
 } from './adanos.helpers';
+import { loadConfig } from '@/lib/config';
 
 const DEFAULT_LOOKBACK_DAYS = 7;
 const FETCH_TIMEOUT_MS = 5000;
 
-function getAdanosBaseUrl(): string {
-    return (process.env.ADANOS_API_BASE_URL || 'https://api.adanos.org').replace(/\/$/, '');
+async function getAdanosBaseUrl(): Promise<string> {
+    const { ADANOS_API_BASE_URL } = await loadConfig();
+    return (ADANOS_API_BASE_URL || 'https://api.adanos.org').replace(/\/$/, '');
 }
 
-function getAdanosApiKey(): string {
-    return process.env.ADANOS_API_KEY ?? '';
+async function getAdanosApiKey(): Promise<string> {
+    const { ADANOS_API_KEY } = await loadConfig();
+    return ADANOS_API_KEY ?? '';
 }
 
 async function fetchCompareSource(
@@ -27,7 +30,7 @@ async function fetchCompareSource(
     days: number,
 ): Promise<SentimentSourceInsight | null> {
     try {
-        const url = new URL(`${getAdanosBaseUrl()}${SOURCE_CONFIG[source].path}`);
+        const url = new URL(`${await getAdanosBaseUrl()}${SOURCE_CONFIG[source].path}`);
         url.searchParams.set('tickers', symbol.toUpperCase());
         url.searchParams.set('days', String(days));
 
@@ -37,7 +40,7 @@ async function fetchCompareSource(
         try {
             response = await fetch(url.toString(), {
                 headers: {
-                    'X-API-Key': getAdanosApiKey(),
+                    'X-API-Key': await getAdanosApiKey(),
                 },
                 signal: abortController.signal,
                 next: { revalidate: 300 },
@@ -69,7 +72,7 @@ export async function getStockSentimentInsights(
     symbol: string,
     days: number = DEFAULT_LOOKBACK_DAYS,
 ): Promise<StockSentimentInsights | null> {
-    if (!getAdanosApiKey() || !symbol?.trim()) {
+    if (!(await getAdanosApiKey()) || !symbol?.trim()) {
         return null;
     }
 

@@ -9,8 +9,14 @@ import {
     CRYPTO_TOP_STORIES_WIDGET_CONFIG,
 } from "@/lib/constants";
 import { getCryptoMarkets, getCryptoNews, searchCrypto } from "@/lib/actions/crypto.actions";
+import MustBuySection from "@/components/screener/MustBuySection";
 
-export default async function CryptoDashboard() {
+interface CryptoDashboardProps {
+    searchParams: Promise<{ strategy?: string }>;
+}
+
+export default async function CryptoDashboard({ searchParams }: CryptoDashboardProps) {
+    const { strategy } = await searchParams;
     const scriptUrl = `https://s3.tradingview.com/external-embedding/embed-widget-`;
 
     const [markets, news, topCoins] = await Promise.all([
@@ -58,6 +64,8 @@ export default async function CryptoDashboard() {
             </section>
 
             <TopCoinsTable coins={markets} />
+
+            <MustBuySection assetType="crypto" strategyId={strategy} />
 
             <section className="grid w-full gap-8 home-section">
                 <div className="h-full md:col-span-1 xl:col-span-2">
