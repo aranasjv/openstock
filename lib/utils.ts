@@ -233,68 +233,44 @@ export function formatSymbolForTradingView(symbol: string): string {
 }
 
 /**
- * Maps CoinGecko coin ids to TradingView crypto pairs.
+ * Builds a TradingView symbol for a crypto coin.
  *
- * TradingView resolves crypto through an exchange prefix (e.g. "BINANCE:BTCUSDT").
- * Only the major listed pairs are mapped explicitly; anything else falls back to
- * TradingView's generic "CRYPTO:" prefix, which may not resolve for obscure coins.
+ * Takes the coin's TICKER, not its CoinGecko id: TradingView trades symbols, and the id
+ * is not one (CoinGecko id "bittensor" vs ticker "TAO"). Passing the id produced
+ * "Invalid Symbol" for every coin outside a hardcoded list.
+ *
+ * The symbol format was verified against TradingView's own symbol pages:
+ *   BINANCE:TAOUSDT   -> 200 (TAO / TetherUS)
+ *   BINANCE:ARBUSDT   -> 200
+ *   COINBASE:TAOUSD   -> 200
+ *   CRYPTO:TAOUSD     -> 404
+ *   CRYPTO:BTCUSD     -> resolves to BTCUSD on Bitstamp
+ *
+ * The last two matter: there is NO generic "CRYPTO:" venue to fall back on, which is what
+ * the previous implementation assumed. Crypto symbols must name a real exchange.
+ *
+ * Rather than a large hardcoded map — which goes stale as coins get delisted or migrate
+ * (FTM -> S, RNDR -> RENDER, MKR delisted) — this defaults to Binance's USDT pair, which
+ * covers most liquid coins. Add a per-ticker override here only if a specific coin's
+ * Binance USDT pair genuinely does not exist.
  */
-const COINGECKO_ID_TO_TRADINGVIEW: Record<string, string> = {
-    'bitcoin': 'BINANCE:BTCUSDT',
-    'ethereum': 'BINANCE:ETHUSDT',
-    'ripple': 'BINANCE:XRPUSDT',
-    'binancecoin': 'BINANCE:BNBUSDT',
-    'solana': 'BINANCE:SOLUSDT',
-    'usd-coin': 'BINANCE:USDCUSDT',
-    'dogecoin': 'BINANCE:DOGEUSDT',
-    'cardano': 'BINANCE:ADAUSDT',
-    'tron': 'BINANCE:TRXUSDT',
-    'avalanche-2': 'BINANCE:AVAXUSDT',
-    'shiba-inu': 'BINANCE:SHIBUSDT',
-    'polkadot': 'BINANCE:DOTUSDT',
-    'chainlink': 'BINANCE:LINKUSDT',
-    'toncoin': 'BINANCE:TONUSDT',
-    'sui': 'BINANCE:SUIUSDT',
-    'stellar': 'BINANCE:XLMUSDT',
-    'hedera-hashgraph': 'BINANCE:HBARUSDT',
-    'litecoin': 'BINANCE:LTCUSDT',
-    'bitcoin-cash': 'BINANCE:BCHUSDT',
-    'uniswap': 'BINANCE:UNIUSDT',
-    'near': 'BINANCE:NEARUSDT',
-    'aptos': 'BINANCE:APTUSDT',
-    'internet-computer': 'BINANCE:ICPUSDT',
-    'ethereum-classic': 'BINANCE:ETCUSDT',
-    'monero': 'BINANCE:XMRUSDT',
-    'filecoin': 'BINANCE:FILUSDT',
-    'cosmos': 'BINANCE:ATOMUSDT',
-    'arbitrum': 'BINANCE:ARBUSDT',
-    'optimism': 'BINANCE:OPUSDT',
-    'injective-protocol': 'BINANCE:INJUSDT',
-    'render-token': 'BINANCE:RENDERUSDT',
-    'cronos': 'BINANCE:CROUSDT',
-    'algorand': 'BINANCE:ALGOUSDT',
-    'the-graph': 'BINANCE:GRTUSDT',
-    'vechain': 'BINANCE:VETUSDT',
-    'maker': 'BINANCE:MKRUSDT',
-    'aave': 'BINANCE:AAVEUSDT',
-    'theta-token': 'BINANCE:THETAUSDT',
-    'axie-infinity': 'BINANCE:AXSUSDT',
-    'decentraland': 'BINANCE:MANAUSDT',
-    'the-sandbox': 'BINANCE:SANDUSDT',
-    'eos': 'BINANCE:EOSUSDT',
-    'tezos': 'BINANCE:XTZUSDT',
-    'flow': 'BINANCE:FLOWUSDT',
-    'fantom': 'BINANCE:FTMUSDT',
-};
 
-export function formatCryptoSymbolForTradingView(coinId: string): string {
-    if (!coinId) return '';
-    const id = coinId.trim().toLowerCase();
+/** Tickers that are valid but have no useful chart, so no symbol is returned. */
+const CRYPTO_WITHOUT_CHART = new Set(['USDT']);
 
-    const mapped = COINGECKO_ID_TO_TRADINGVIEW[id];
-    if (mapped) return mapped;
+/**
+ * Returns null when no reasonable symbol can be derived, so callers can hide the chart
+ * rather than render TradingView's "Invalid Symbol" placeholder.
+ */
+export function formatCryptoSymbolForTradingView(ticker: string): string | null {
+    if (!ticker) return null;
 
-    return `CRYPTO:${id.toUpperCase()}USD`;
+    const normalized = ticker.trim().toUpperCase();
+    // TradingView tickers are short alphanumerics; anything else is junk from upstream.
+    if (!/^[A-Z0-9]{1,12}$/.test(normalized)) return null;
+    if (CRYPTO_WITHOUT_CHART.has(normalized)) return null;
+
+    return `BINANCE:${normalized}USDT`;
 }
 
 /**

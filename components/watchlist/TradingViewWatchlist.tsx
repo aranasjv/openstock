@@ -5,8 +5,12 @@ import { formatSymbolForTradingView } from '@/lib/utils';
 
 interface TradingViewWatchlistProps {
     symbols: string[];
-    /** Override how a stored symbol maps to a TradingView symbol (e.g. for crypto). */
-    formatSymbol?: (symbol: string) => string;
+    /**
+     * Maps a stored symbol to a TradingView symbol. Returns null when no sensible symbol
+     * exists (e.g. a crypto coin with no matching pair), so it can be skipped instead of
+     * rendering an "Invalid Symbol" row.
+     */
+    formatSymbol?: (symbol: string) => string | null;
     groupName?: string;
 }
 
@@ -17,25 +21,23 @@ function TradingViewWatchlist({
 }: TradingViewWatchlistProps) {
     const container = useRef<HTMLDivElement>(null);
 
+    // Resolve first so we can decide whether there is anything worth rendering.
+    const symbolList = symbols
+        .map((symbol) => ({ name: formatSymbol(symbol), displayName: symbol }))
+        .filter((entry): entry is { name: string; displayName: string } => Boolean(entry.name));
+
     useEffect(() => {
         if (!container.current) return;
 
-        // Clear previous widget if any (though React key usually handles this, safety check)
+        // Clear previous widget if any (though React key usually handles it, safety check)
         container.current.innerHTML = "";
+
+        if (symbolList.length === 0) return;
 
         const script = document.createElement("script");
         script.src = "https://s3.tradingview.com/external-embedding/embed-widget-market-quotes.js";
         script.type = "text/javascript";
         script.async = true;
-
-        // Map user symbols to TradingView format
-        // TradingView is smart enough to handle "AAPL", "GOOG" usually, but "NASDAQ:AAPL" is safer.
-        // Since we don't have exchange data easily, we'll try raw symbol. 
-        // Ideally we'd prefix "NASDAQ:" or "NYSE:" but let's test without first.
-        const symbolList = symbols.map(s => ({
-            name: formatSymbol(s),
-            displayName: s
-        }));
 
         script.innerHTML = JSON.stringify({
             "width": "100%",
@@ -48,16 +50,26 @@ function TradingViewWatchlist({
             ],
             "showSymbolLogo": true,
             "isTransparent": true,
-            "colorTheme": "dark", // We can make this dynamic if needed
+            "colorTheme": "dark",
             "locale": "en"
         });
 
         container.current.appendChild(script);
-    }, [symbols]);
+        // `symbolList` is derived from `symbols` and `formatSymbol`.
+    }, [JSON.stringify(symbolList), groupName]);
 
     return (
         <div className="tradingview-widget-container border border-white/10 rounded-xl overflow-hidden shadow-2xl bg-black/40 backdrop-blur-md" ref={container}>
-            <div className="tradingview-widget-container__widget"></div>
+            <div className="tradingview-widget-container__widget">
+                {symbolList.length === 0 ? (
+                    <div className="flex h-[550px] flex-col items-center justify-center gap-2 p-6 text-center">
+                        <p className="text-sm text-gray-400">No chartable symbols yet</p>
+                        <p className="max-w-sm text-xs text-gray-600">
+                            Add a stock or coin and it will appear here.
+                        </p>
+                    </div>
+                ) : null}
+            </div>
         </div>
     );
 }
