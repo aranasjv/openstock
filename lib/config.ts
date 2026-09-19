@@ -19,7 +19,7 @@ import { AppSettingsModel, SETTINGS_DOC_KEY } from '@/database/models/settings.m
  * which is what keeps API keys off the browser.
  */
 
-export type SettingGroup = 'ai' | 'market' | 'sentiment' | 'email' | 'automation' | 'screener' | 'system';
+export type SettingGroup = 'ai' | 'market' | 'sentiment' | 'notifications' | 'email' | 'automation' | 'screener' | 'system';
 
 export interface SettingDef {
     /** Canonical key used in code. */
@@ -113,6 +113,95 @@ export const CONFIG_SCHEMA: SettingDef[] = [
     { key: 'ADANOS_API_KEY', group: 'sentiment', env: ['ADANOS_API_KEY'], label: 'Adanos API key', description: 'Optional. Enables the stock sentiment card.', secret: true, type: 'password' },
     { key: 'ADANOS_API_BASE_URL', group: 'sentiment', env: ['ADANOS_API_BASE_URL'], label: 'Adanos base URL', default: 'https://api.adanos.org' },
 
+    // ── Notifications (Telegram) ────────────────────────────────────
+    {
+        key: 'TELEGRAM_BOT_TOKEN',
+        group: 'notifications',
+        env: ['TELEGRAM_BOT_TOKEN'],
+        label: 'Telegram bot token',
+        description: 'Create a bot with @BotFather and paste its token here.',
+        secret: true,
+        type: 'password',
+    },
+    {
+        key: 'TELEGRAM_STOCK_CHAT_ID',
+        group: 'notifications',
+        env: ['TELEGRAM_STOCK_CHAT_ID'],
+        label: 'Stock chat id',
+        description: 'Where stock alerts and the stock section of the daily digest are sent.',
+    },
+    {
+        key: 'TELEGRAM_CRYPTO_CHAT_ID',
+        group: 'notifications',
+        env: ['TELEGRAM_CRYPTO_CHAT_ID'],
+        label: 'Crypto chat id',
+        description: 'Where crypto alerts and the crypto section of the daily digest are sent.',
+    },
+    {
+        key: 'TELEGRAM_ENABLED',
+        group: 'notifications',
+        env: ['TELEGRAM_ENABLED'],
+        label: 'Send Telegram notifications',
+        description: 'Turn off to pause all Telegram delivery without clearing the token.',
+        default: 'true',
+        type: 'select',
+        options: ['true', 'false'],
+    },
+    {
+        key: 'TELEGRAM_API_BASE_URL',
+        group: 'notifications',
+        env: ['TELEGRAM_API_BASE_URL'],
+        label: 'Telegram API base URL',
+        description: 'Only change this to point at a self-hosted Bot API server.',
+        default: 'https://api.telegram.org',
+    },
+    {
+        key: 'ALERT_CHECK_MINUTES',
+        group: 'notifications',
+        env: ['ALERT_CHECK_MINUTES'],
+        label: 'Alert check interval (minutes)',
+        description: 'How often price alerts are evaluated. Alerts are polled, not pushed.',
+        default: '5',
+        type: 'number',
+    },
+    {
+        key: 'DIGEST_ENABLED',
+        group: 'notifications',
+        env: ['DIGEST_ENABLED'],
+        label: 'Send the daily digest',
+        description: 'Must-buy screen for stocks and crypto, plus your holdings.',
+        default: 'true',
+        type: 'select',
+        options: ['true', 'false'],
+    },
+    {
+        key: 'DIGEST_HOUR',
+        group: 'notifications',
+        env: ['DIGEST_HOUR'],
+        label: 'Digest hour (0-23)',
+        description: 'Hour of the day, interpreted in the timezone below.',
+        default: '8',
+        type: 'number',
+    },
+    {
+        key: 'DIGEST_TIMEZONE',
+        group: 'notifications',
+        env: ['DIGEST_TIMEZONE'],
+        label: 'Digest timezone',
+        description: 'IANA name, e.g. Asia/Manila or America/New_York. The container clock is UTC, so this decides when "8" means 8am.',
+        default: 'UTC',
+    },
+    {
+        key: 'DIGEST_MARKET',
+        group: 'notifications',
+        env: ['DIGEST_MARKET'],
+        label: 'Digest market',
+        description: 'Which market the digest screens for must-buy candidates.',
+        default: 'both',
+        type: 'select',
+        options: ['both', 'stocks', 'crypto'],
+    },
+
     // ── Email ───────────────────────────────────────────────────────
     { key: 'NODEMAILER_EMAIL', group: 'email', env: ['NODEMAILER_EMAIL'], label: 'Gmail address' },
     { key: 'NODEMAILER_PASSWORD', group: 'email', env: ['NODEMAILER_PASSWORD'], label: 'Gmail app password', secret: true, type: 'password' },
@@ -132,6 +221,16 @@ export const CONFIG_SCHEMA: SettingDef[] = [
     { key: 'KIT_WELCOME_FORM_ID', group: 'automation', env: ['KIT_WELCOME_FORM_ID'], label: 'Kit welcome form ID' },
 
     // ── Screener ────────────────────────────────────────────────────
+    {
+        key: 'SCREENER_STRATEGY',
+        group: 'screener',
+        env: ['SCREENER_STRATEGY'],
+        label: 'Default strategy',
+        description: 'Used by the daily digest. The dashboard dropdown can still be changed per view.',
+        default: 'trend-following',
+        type: 'select',
+        options: ['trend-following', 'momentum', 'oversold-pullback', 'breakout', 'mean-reversion'],
+    },
     {
         key: 'SCREENER_UNIVERSE_SIZE',
         group: 'screener',
@@ -193,6 +292,7 @@ const SCHEMA_BY_KEY = new Map(CONFIG_SCHEMA.map((def) => [def.key, def]));
 export const SETTING_GROUPS: { id: SettingGroup; label: string }[] = [
     { id: 'ai', label: 'AI Providers' },
     { id: 'market', label: 'Market Data' },
+    { id: 'notifications', label: 'Telegram Notifications' },
     { id: 'sentiment', label: 'Sentiment' },
     { id: 'email', label: 'Email' },
     { id: 'automation', label: 'Automation' },

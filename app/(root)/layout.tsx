@@ -1,4 +1,5 @@
 import Header from "@/components/Header";
+import Sidebar from "@/components/layout/Sidebar";
 import { getAuth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -21,16 +22,24 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
     }
 
     return (
-        <main className="min-h-screen text-gray-400">
-            <Header user={user} />
+        // Sidebar on desktop, slim header (with the nav in the user dropdown) on mobile.
+        <div className="flex min-h-screen text-gray-400">
+            <Sidebar user={user} />
 
-            <div className="container py-10">
-                {children}
+            <div className="flex min-w-0 flex-1 flex-col">
+                <div className="lg:hidden">
+                    <Header user={user} />
+                </div>
+
+                <main className="min-w-0 flex-1">
+                    {children}
+                </main>
+
+                <Footer />
             </div>
 
-            <Footer />
             <DonatePopup />
-        </main>
+        </div>
     )
 }
-export default Layout
+export default Layout;

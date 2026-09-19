@@ -31,7 +31,7 @@ export async function addToWatchlist(
         );
 
         revalidatePath('/watchlist');
-        revalidatePath('/crypto/watchlist');
+        revalidatePath('/holdings');
         return JSON.parse(JSON.stringify(newItem));
     } catch (error) {
         console.error('Error adding to watchlist:', error);
@@ -48,7 +48,7 @@ export async function removeFromWatchlist(
         await connectToDatabase();
         await Watchlist.findOneAndDelete({ userId, symbol: symbol.toUpperCase(), assetType });
         revalidatePath('/watchlist');
-        revalidatePath('/crypto/watchlist');
+        revalidatePath('/holdings');
         revalidatePath('/'); // In case it's used elsewhere
         return { success: true };
     } catch (error) {

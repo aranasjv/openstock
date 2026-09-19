@@ -21,7 +21,7 @@ export async function createAlert(params: {
             // expiresAt handled by default value in schema
         });
         revalidatePath('/watchlist');
-        revalidatePath('/crypto/watchlist');
+        revalidatePath('/holdings');
         return JSON.parse(JSON.stringify(newAlert));
     } catch (error) {
         console.error('Error creating alert:', error);

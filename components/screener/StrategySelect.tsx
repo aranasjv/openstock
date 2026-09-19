@@ -25,15 +25,15 @@ export default function StrategySelect({ strategies, selected }: StrategySelectP
     const active = strategies.find((s) => s.id === selected);
 
     return (
-        <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
-            <label htmlFor="strategy" className="text-xs font-medium uppercase tracking-wider text-gray-500">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
+            <label htmlFor="strategy" className="shrink-0 text-[10px] font-medium uppercase tracking-wider text-gray-500">
                 Strategy
             </label>
             <select
                 id="strategy"
                 value={selected}
                 onChange={(e) => handleChange(e.target.value)}
-                className="h-9 rounded-md border border-gray-800 bg-[#1C1C1F] px-3 text-sm text-white"
+                className="h-8 rounded-md border border-gray-800 bg-[#1C1C1F] px-2 text-xs text-white"
             >
                 {strategies.map((strategy) => (
                     <option key={strategy.id} value={strategy.id}>
@@ -42,7 +42,9 @@ export default function StrategySelect({ strategies, selected }: StrategySelectP
                 ))}
             </select>
             {active?.summary ? (
-                <p className="text-xs text-gray-500 sm:max-w-xl">{active.summary}</p>
+                <p className="truncate text-[11px] text-gray-600" title={active.summary}>
+                    {active.summary}
+                </p>
             ) : null}
         </div>
     );

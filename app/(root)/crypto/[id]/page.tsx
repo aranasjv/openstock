@@ -13,7 +13,7 @@ import { getAuth } from '@/lib/better-auth/auth';
 import { headers } from 'next/headers';
 import { isStockInWatchlist } from '@/lib/actions/watchlist.actions';
 import { getCryptoCoinDetail } from '@/lib/actions/crypto.actions';
-import { formatCryptoSymbolForTradingView } from '@/lib/utils';
+import { resolveCryptoTradingViewSymbol } from '@/lib/tradingview';
 
 function ChartUnavailable({ label }: { label: string }) {
     return (
@@ -43,10 +43,13 @@ export default async function CryptoDetails({ params }: CryptoDetailsPageProps) 
         getCryptoCoinDetail(coinId),
     ]);
 
-    // TradingView needs the ticker ("TAO"), not the CoinGecko id ("bittensor"). The detail
-    // response is the only place that ticker is available, so the symbol is resolved after
-    // it arrives — and left null when it cannot be, so the charts can be skipped.
-    const tvSymbol = coin?.symbol ? formatCryptoSymbolForTradingView(coin.symbol) : null;
+    // TradingView needs the ticker ("TAO"), not the CoinGecko id ("bittensor"), and it needs
+    // a venue that actually lists the coin. The ticker only arrives with the detail response,
+    // so resolution happens after it — verified against TradingView rather than assumed, and
+    // left null when no venue has it so the charts can be skipped.
+    const tvSymbol = coin?.symbol
+        ? await resolveCryptoTradingViewSymbol(coin.symbol)
+        : null;
 
     return (
         <div className="flex min-h-screen p-4 md:p-6 lg:p-8">

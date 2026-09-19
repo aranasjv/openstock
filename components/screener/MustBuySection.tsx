@@ -28,38 +28,37 @@ export default async function MustBuySection({ assetType, strategyId }: MustBuyS
     const strongCount = ranked.filter((candidate) => candidate.tier === 'Strong').length;
 
     return (
-        <section className="rounded-xl border border-gray-800 bg-gray-900/30">
-            <div className="flex flex-col gap-4 border-b border-gray-800 p-5">
-                <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
-                    <h2 className="text-lg font-semibold text-white">
+        <section className="flex h-full flex-col overflow-hidden rounded-xl border border-gray-800 bg-gray-900/30">
+            <div className="shrink-0 space-y-2.5 border-b border-gray-800 p-3">
+                <div className="flex items-center justify-between gap-3">
+                    <h2 className="text-sm font-semibold text-white">
                         Must Buy
-                        <span className="ml-2 text-sm font-normal text-gray-500">
+                        <span className="ml-2 text-xs font-normal text-gray-500">
                             {assetType === 'crypto' ? 'crypto' : 'stocks'}
                         </span>
                     </h2>
-                    <p className="text-xs text-gray-600">
+                    <p className="text-[11px] text-gray-600">
                         {result.scanned} scanned · {ranked.length} matched · {strongCount} strong
                     </p>
                 </div>
 
-                <Suspense fallback={<div className="h-9" />}>
+                <Suspense fallback={<div className="h-8" />}>
                     <StrategySelect strategies={result.strategies} selected={selected} />
                 </Suspense>
 
-                <p className="flex items-start gap-2 text-xs text-gray-500">
-                    <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <p className="flex items-start gap-1.5 text-[11px] leading-snug text-gray-600">
+                    <Info className="mt-0.5 h-3 w-3 shrink-0" />
                     <span>
-                        Rule-based technical screen, not investment advice. A score is the share of
-                        the strategy&apos;s conditions an asset currently meets — it is not a
-                        forecast, and no strategy here has been backtested. Expand a row to see
-                        exactly which conditions passed.
+                        Rule-based technical screen, not investment advice. Expand a row to see which
+                        conditions passed.
                     </span>
                 </p>
             </div>
 
-            {ranked.length > 0 ? (
-                <div>
-                    {ranked.map((candidate, index) => (
+            {/* Scrolls internally so the dashboard itself does not grow. */}
+            <div className="min-h-0 flex-1 overflow-y-auto">
+                {ranked.length > 0 ? (
+                    ranked.map((candidate, index) => (
                         <CandidateRow
                             key={candidate.symbol}
                             rank={index + 1}
@@ -67,21 +66,19 @@ export default async function MustBuySection({ assetType, strategyId }: MustBuyS
                             assetType={assetType}
                             strategyId={selected}
                         />
-                    ))}
-                </div>
-            ) : (
-                <div className="p-6 text-sm text-gray-500">
-                    {result.unavailableReason ??
-                        'No assets currently match this strategy. That is a normal outcome — try another strategy.'}
-                </div>
-            )}
+                    ))
+                ) : (
+                    <div className="p-4 text-xs text-gray-500">
+                        {result.unavailableReason ??
+                            'No assets currently match this strategy. That is a normal outcome — try another strategy.'}
+                    </div>
+                )}
+            </div>
 
             {result.degraded && ranked.length > 0 ? (
-                <p className="border-t border-gray-800 px-5 py-3 text-xs text-yellow-600/80">
+                <p className="shrink-0 border-t border-gray-800 px-3 py-2 text-[11px] text-yellow-600/80">
                     {result.unavailable} of {result.scanned} assets could not be analysed
-                    {assetType === 'stock'
-                        ? ' — the free stock history source is unofficial and may be rate limited.'
-                        : '.'}
+                    {assetType === 'stock' ? ' — the free stock history source is unofficial.' : '.'}
                 </p>
             ) : null}
         </section>

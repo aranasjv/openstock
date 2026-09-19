@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { formatCryptoSymbolForTradingView } from '@/lib/utils';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { formatCryptoSymbolForTradingView, cryptoTradingViewCandidates } from '@/lib/utils';
+import { resolveCryptoTradingViewSymbol, verifyTradingViewSymbol } from '@/lib/tradingview';
 
 /**
  * Regression tests for the crypto TradingView symbol.
@@ -52,5 +53,72 @@ describe('formatCryptoSymbolForTradingView', () => {
     expect(formatCryptoSymbolForTradingView('USDC')).toBe('BINANCE:USDCUSDT');
     expect(formatCryptoSymbolForTradingView('DOGE')).toBe('BINANCE:DOGEUSDT');
     expect(formatCryptoSymbolForTradingView('SHIB')).toBe('BINANCE:SHIBUSDT');
+  });
+});
+
+describe('cryptoTradingViewCandidates', () => {
+  it('offers several venues, best guess first', () => {
+    const candidates = cryptoTradingViewCandidates('TAO');
+    expect(candidates[0]).toBe('BINANCE:TAOUSDT');
+    expect(candidates).toContain('COINBASE:TAOUSD');
+    expect(candidates.length).toBeGreaterThan(3);
+  });
+
+  it('never offers a CRYPTO: symbol, which does not resolve', () => {
+    expect(cryptoTradingViewCandidates('TAO').some((c) => c.startsWith('CRYPTO:'))).toBe(false);
+  });
+
+  it('returns nothing for junk input or a stablecoin', () => {
+    expect(cryptoTradingViewCandidates('')).toEqual([]);
+    expect(cryptoTradingViewCandidates('../etc')).toEqual([]);
+    expect(cryptoTradingViewCandidates('USDT')).toEqual([]);
+  });
+});
+
+describe('verified TradingView resolution', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /**
+   * The scanner endpoint answers "does this symbol exist": 200 with data, 404 with
+   * symbol_not_exists. These tests pin that contract, because the whole point of this layer
+   * is to stop guessing at symbol formats.
+   */
+  const respond = (okFor: (url: string) => boolean) =>
+    vi.fn().mockImplementation((url: string) => {
+      const symbol = decodeURIComponent(String(url).split('symbol=')[1]?.split('&')[0] ?? '');
+      return Promise.resolve(okFor(symbol) ? { ok: true } : { ok: false, status: 404 });
+    });
+
+  it('returns the first candidate that exists', async () => {
+    vi.stubGlobal('fetch', respond((symbol) => symbol === 'BINANCE:TAOUSDT'));
+    expect(await resolveCryptoTradingViewSymbol('TAO')).toBe('BINANCE:TAOUSDT');
+  });
+
+  it('falls through to another venue when Binance does not list the coin', async () => {
+    // This is the "missing ticker" case: Binance has no such pair, so a Binance-only rule
+    // would have produced an invalid chart.
+    vi.stubGlobal('fetch', respond((symbol) => symbol === 'MEXC:OBSCUREUSDT'));
+    expect(await resolveCryptoTradingViewSymbol('OBSCURE')).toBe('MEXC:OBSCUREUSDT');
+  });
+
+  it('returns null when no venue lists the coin, so the chart can be hidden', async () => {
+    vi.stubGlobal('fetch', respond(() => false));
+    expect(await resolveCryptoTradingViewSymbol('NOTREAL')).toBeNull();
+  });
+
+  it('does not probe at all for a ticker that cannot form a symbol', async () => {
+    const mock = respond(() => true);
+    vi.stubGlobal('fetch', mock);
+    expect(await resolveCryptoTradingViewSymbol('USDT')).toBeNull();
+    expect(mock).not.toHaveBeenCalled();
+  });
+
+  it('reports a probe as not-verified when the request throws', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(await verifyTradingViewSymbol('BINANCE:BTCUSDT')).toBe(false);
+    spy.mockRestore();
   });
 });

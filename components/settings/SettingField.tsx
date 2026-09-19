@@ -3,7 +3,7 @@
 import React, { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { updateSettings, testProvider } from '@/lib/actions/settings.actions';
+import { updateSettings, testProvider, discoverTelegramChats } from '@/lib/actions/settings.actions';
 
 interface SettingFieldProps {
     field: {
@@ -22,18 +22,23 @@ interface SettingFieldProps {
     onChange: (key: string, value: string) => void;
 }
 
-const PROVIDER_TEST_TARGETS: Record<string, 'deepseek' | 'gemini' | 'minimax' | 'siray' | 'finnhub' | 'coingecko'> = {
+const PROVIDER_TEST_TARGETS: Record<string, 'deepseek' | 'gemini' | 'minimax' | 'siray' | 'finnhub' | 'coingecko' | 'telegram'> = {
     DEEPSEEK_API_KEY: 'deepseek',
     GEMINI_API_KEY: 'gemini',
     MINIMAX_API_KEY: 'minimax',
     SIRAY_API_KEY: 'siray',
     FINNHUB_API_KEY: 'finnhub',
     COINGECKO_API_KEY: 'coingecko',
+    TELEGRAM_BOT_TOKEN: 'telegram',
 };
+
+/** Fields that get the "find my chat id" helper. */
+const TELEGRAM_CHAT_KEYS = new Set(['TELEGRAM_STOCK_CHAT_ID', 'TELEGRAM_CRYPTO_CHAT_ID']);
 
 export default function SettingField({ field, value, onChange }: SettingFieldProps) {
     const [pending, startTransition] = useTransition();
     const testTarget = PROVIDER_TEST_TARGETS[field.key];
+    const isChatIdField = TELEGRAM_CHAT_KEYS.has(field.key);
 
     const handleTest = () => {
         if (!testTarget) return;
@@ -41,6 +46,25 @@ export default function SettingField({ field, value, onChange }: SettingFieldPro
             const result = await testProvider(testTarget);
             if (result.ok) toast.success(result.message);
             else toast.error(result.message);
+        });
+    };
+
+    const handleDiscover = () => {
+        startTransition(async () => {
+            const result = await discoverTelegramChats();
+            if (!result.ok) {
+                toast.error(result.message);
+                return;
+            }
+            if (!result.chats || result.chats.length === 0) {
+                toast.warning(result.message);
+                return;
+            }
+            // Copy the first match straight into the field so there is nothing to transcribe.
+            onChange(field.key, result.chats[0].id);
+            toast.success(
+                `Found ${result.chats.map((c) => `${c.label} (${c.id})`).join(', ')} — filled in the first. Save to apply.`
+            );
         });
     };
 
@@ -77,6 +101,19 @@ export default function SettingField({ field, value, onChange }: SettingFieldPro
                             className="h-7 px-2 text-xs text-gray-400 hover:text-white hover:bg-white/10"
                         >
                             {pending ? 'Testing…' : 'Test'}
+                        </Button>
+                    ) : null}
+                    {isChatIdField ? (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={pending}
+                            onClick={handleDiscover}
+                            title="Message your bot in Telegram first, then click to read the chat id back."
+                            className="h-7 px-2 text-xs text-gray-400 hover:text-white hover:bg-white/10"
+                        >
+                            Find chat id
                         </Button>
                     ) : null}
                 </div>

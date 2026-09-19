@@ -43,7 +43,12 @@ export default function AlertsPanel({ alerts, onRefresh }: AlertsPanelProps) {
                                             {alert.symbol[0]}
                                         </div>
                                         <div>
-                                            <div className="font-bold text-white text-sm">{alert.symbol}</div>
+                                            <div className="font-bold text-white text-sm flex items-center gap-1.5">
+                                                {alert.symbol}
+                                                <span className="rounded bg-gray-800 px-1 text-[9px] font-medium uppercase tracking-wide text-gray-400">
+                                                    {alert.assetType === 'crypto' ? 'coin' : 'stock'}
+                                                </span>
+                                            </div>
                                             <div className="text-xs text-gray-400">Target: {formatCurrency(alert.targetPrice)}</div>
                                         </div>
                                     </div>

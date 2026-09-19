@@ -202,125 +202,20 @@ export const sendWeeklyNewsSummary = inngest.createFunction(
     }
 )
 
+/**
+ * Alert evaluation and Telegram delivery.
+ *
+ * Delegates to the shared job so the Inngest cron and the built-in scheduler run identical
+ * logic. Keeping two copies would mean an alert that fires under one trigger but not the
+ * other — the worst possible bug for an alerting feature.
+ */
 export const checkStockAlerts = inngest.createFunction(
     { id: 'check-stock-alerts', triggers: [{ cron: '*/5 * * * *' }] }, // Run every 5 minutes
     async ({ step }) => {
-        // Step 1: Fetch active alerts
-        const activeAlerts = await step.run('fetch-active-alerts', async () => {
-            // Dynamic import to avoid circular dep issues if any, or just standard import
-            const { connectToDatabase } = await import("@/database/mongoose");
-            const { Alert } = await import("@/database/models/alert.model");
-
-            await connectToDatabase();
-            const now = new Date();
-
-            return await Alert.find({
-                active: true,
-                triggered: false,
-                expiresAt: { $gt: now }
-            }).lean();
+        return await step.run('run-alert-check', async () => {
+            const { runAlertCheck } = await import('@/lib/jobs/alert-check');
+            return await runAlertCheck();
         });
-
-        if (!activeAlerts || activeAlerts.length === 0) {
-            return { message: 'No active alerts to check.' };
-        }
-
-        // Step 2: Group symbols by asset type
-        const stockSymbols = [
-            ...new Set(
-                activeAlerts
-                    .filter((a: any) => (a.assetType ?? 'stock') === 'stock')
-                    .map((a: any) => a.symbol)
-            ),
-        ];
-        const cryptoSymbols = [
-            ...new Set(
-                activeAlerts
-                    .filter((a: any) => a.assetType === 'crypto')
-                    .map((a: any) => a.symbol)
-            ),
-        ];
-
-        // Step 3: Fetch prices
-        const prices = await step.run('fetch-prices', async () => {
-            const priceMap: Record<string, number> = {};
-
-            if (stockSymbols.length > 0) {
-                const { getQuote } = await import("@/lib/actions/finnhub.actions");
-
-                // Process in chunks to be safe
-                for (const sym of stockSymbols) {
-                    try {
-                        const quote = await getQuote(sym as string);
-                        if (quote && quote.c) {
-                            priceMap[sym as string] = quote.c;
-                        }
-                    } catch (e) {
-                        console.error(`Failed to fetch price for ${sym}`, e);
-                    }
-                }
-            }
-
-            if (cryptoSymbols.length > 0) {
-                try {
-                    // One batched CoinGecko call for every crypto alert.
-                    const { getCryptoMarketsByIds } = await import("@/lib/actions/crypto.actions");
-                    const markets = await getCryptoMarketsByIds(cryptoSymbols as string[]);
-                    for (const coin of markets) {
-                        // Alert symbols are stored uppercase, so match that key.
-                        priceMap[coin.id.toUpperCase()] = coin.currentPrice;
-                    }
-                } catch (e) {
-                    console.error('Failed to fetch crypto prices', e);
-                }
-            }
-
-            return priceMap;
-        });
-
-        // Step 4: Check conditions
-        type TriggeredAlert = { alert: any; currentPrice: number };
-        const triggeredAlerts: TriggeredAlert[] = [];
-
-        for (const alert of activeAlerts as any[]) {
-            const currentPrice = prices[alert.symbol];
-            if (!currentPrice) continue;
-
-            let isTriggered = false;
-            // Simple check
-            if (alert.condition === 'ABOVE' && currentPrice >= alert.targetPrice) {
-                isTriggered = true;
-            } else if (alert.condition === 'BELOW' && currentPrice <= alert.targetPrice) {
-                isTriggered = true;
-            }
-
-            if (isTriggered) {
-                triggeredAlerts.push({ alert, currentPrice });
-            }
-        }
-
-        // Step 5: Process triggers
-        if (triggeredAlerts.length > 0) {
-            await step.run('process-triggered-alerts', async () => {
-                const { connectToDatabase } = await import("@/database/mongoose");
-                const { Alert } = await import("@/database/models/alert.model");
-                // In a real app we would import 'kit' here and use kit.sendBroadcast or similar
-                // For now, we just log it as the critical logic is the detection
-                await connectToDatabase();
-
-                for (const { alert, currentPrice } of triggeredAlerts) {
-                    console.log(`🚀 ALERT FIRED: ${alert.symbol} is ${currentPrice} (${alert.condition} ${alert.targetPrice})`);
-
-                    // Mark triggered
-                    await Alert.findByIdAndUpdate(alert._id, { triggered: true, active: false });
-                }
-            });
-        }
-
-        return {
-            processed: activeAlerts.length,
-            triggered: triggeredAlerts.length
-        };
     }
 );
 

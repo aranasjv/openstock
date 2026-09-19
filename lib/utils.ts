@@ -233,44 +233,60 @@ export function formatSymbolForTradingView(symbol: string): string {
 }
 
 /**
- * Builds a TradingView symbol for a crypto coin.
+ * TradingView crypto symbols must name a real exchange. There is no generic "CRYPTO:"
+ * venue to fall back on — verified against TradingView's own symbol pages:
+ *   BINANCE:TAOUSDT  -> 200      CRYPTO:TAOUSD -> 404
+ *   COINBASE:TAOUSD  -> 200      CRYPTO:BTCUSD -> resolves to BTCUSD on Bitstamp
  *
- * Takes the coin's TICKER, not its CoinGecko id: TradingView trades symbols, and the id
- * is not one (CoinGecko id "bittensor" vs ticker "TAO"). Passing the id produced
- * "Invalid Symbol" for every coin outside a hardcoded list.
+ * The ticker is required, not the CoinGecko id: id "bittensor" is not a tradable symbol,
+ * which is why /crypto/bittensor previously rendered "Invalid Symbol".
  *
- * The symbol format was verified against TradingView's own symbol pages:
- *   BINANCE:TAOUSDT   -> 200 (TAO / TetherUS)
- *   BINANCE:ARBUSDT   -> 200
- *   COINBASE:TAOUSD   -> 200
- *   CRYPTO:TAOUSD     -> 404
- *   CRYPTO:BTCUSD     -> resolves to BTCUSD on Bitstamp
+ * Venues are ordered by how likely they are to list a given coin. `resolveCryptoTradingViewSymbol`
+ * (lib/tradingview.ts) probes these against TradingView and keeps the first that exists, so
+ * an unlisted venue degrades to the next rather than to a broken chart.
  *
- * The last two matter: there is NO generic "CRYPTO:" venue to fall back on, which is what
- * the previous implementation assumed. Crypto symbols must name a real exchange.
- *
- * Rather than a large hardcoded map — which goes stale as coins get delisted or migrate
- * (FTM -> S, RNDR -> RENDER, MKR delisted) — this defaults to Binance's USDT pair, which
- * covers most liquid coins. Add a per-ticker override here only if a specific coin's
- * Binance USDT pair genuinely does not exist.
+ * Prefixes listed here were each confirmed as accepted by TradingView's scanner endpoint.
  */
+const CRYPTO_VENUES: { exchange: string; quote: string }[] = [
+    { exchange: 'BINANCE', quote: 'USDT' },
+    { exchange: 'OKX', quote: 'USDT' },
+    { exchange: 'BYBIT', quote: 'USDT' },
+    { exchange: 'MEXC', quote: 'USDT' },
+    { exchange: 'KUCOIN', quote: 'USDT' },
+    { exchange: 'BITGET', quote: 'USDT' },
+    { exchange: 'COINBASE', quote: 'USD' },
+    { exchange: 'KRAKEN', quote: 'USD' },
+];
 
-/** Tickers that are valid but have no useful chart, so no symbol is returned. */
+/** Tickers that are valid but have no useful chart. */
 const CRYPTO_WITHOUT_CHART = new Set(['USDT']);
 
-/**
- * Returns null when no reasonable symbol can be derived, so callers can hide the chart
- * rather than render TradingView's "Invalid Symbol" placeholder.
- */
-export function formatCryptoSymbolForTradingView(ticker: string): string | null {
+function normalizeCryptoTicker(ticker: string): string | null {
     if (!ticker) return null;
-
     const normalized = ticker.trim().toUpperCase();
     // TradingView tickers are short alphanumerics; anything else is junk from upstream.
     if (!/^[A-Z0-9]{1,12}$/.test(normalized)) return null;
     if (CRYPTO_WITHOUT_CHART.has(normalized)) return null;
+    return normalized;
+}
 
-    return `BINANCE:${normalized}USDT`;
+/**
+ * Every plausible TradingView symbol for a ticker, best guess first.
+ * Returns an empty array when no symbol can be constructed.
+ */
+export function cryptoTradingViewCandidates(ticker: string): string[] {
+    const normalized = normalizeCryptoTicker(ticker);
+    if (!normalized) return [];
+
+    return CRYPTO_VENUES.map(({ exchange, quote }) => `${exchange}:${normalized}${quote}`);
+}
+
+/**
+ * The first candidate, unverified. Prefer `resolveCryptoTradingViewSymbol`, which confirms
+ * the symbol exists; this is only for callers that cannot await a network check.
+ */
+export function formatCryptoSymbolForTradingView(ticker: string): string | null {
+    return cryptoTradingViewCandidates(ticker)[0] ?? null;
 }
 
 /**

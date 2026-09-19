@@ -5,8 +5,8 @@ import CryptoWatchlistChip from './CryptoWatchlistChip';
 import TradingViewWatchlist from '@/components/watchlist/TradingViewWatchlist';
 import { Button } from '@/components/ui/button';
 import { ArrowDownAZ, ArrowUpZA, ArrowUpDown } from 'lucide-react';
-import { formatCryptoSymbolForTradingView } from '@/lib/utils';
 import { getCryptoMarketsByIds } from '@/lib/actions/crypto.actions';
+import { resolveCryptoSymbols } from '@/lib/actions/tradingview.actions';
 
 interface CryptoWatchlistManagerProps {
     initialItems: Array<{ symbol: string; company: string; addedAt?: string }>;
@@ -16,6 +16,7 @@ interface CryptoWatchlistManagerProps {
 export default function CryptoWatchlistManager({ initialItems, userId }: CryptoWatchlistManagerProps) {
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null);
     const [coins, setCoins] = useState<Record<string, CryptoMarketCoin>>({});
+    const [symbols, setSymbols] = useState<Record<string, string | null>>({});
 
     const toggleSort = () => {
         if (sortOrder === null) setSortOrder('asc');
@@ -39,26 +40,34 @@ export default function CryptoWatchlistManager({ initialItems, userId }: CryptoW
     const coinIdsKey = coinIds.join(',');
 
     /**
-     * One batched CoinGecko request for the whole watchlist, rather than one per chip.
-     * This also supplies the tickers the TradingView widgets need — the stored value is
-     * the CoinGecko id, which is not a tradable symbol.
+     * One batched CoinGecko request for the whole watchlist, plus one batched TradingView
+     * resolution. The stored value is the CoinGecko id, which is neither a ticker nor a
+     * tradable symbol, so both facts have to be looked up.
      */
     useEffect(() => {
         if (coinIds.length === 0) {
             setCoins({});
+            setSymbols({});
             return;
         }
 
         let cancelled = false;
 
         getCryptoMarketsByIds(coinIds)
-            .then((results) => {
+            .then(async (results) => {
                 if (cancelled) return;
+
                 const map: Record<string, CryptoMarketCoin> = {};
                 for (const coin of results) {
                     map[coin.id.toUpperCase()] = coin;
                 }
                 setCoins(map);
+
+                const tickers = results.map((coin) => coin.symbol).filter(Boolean);
+                if (tickers.length === 0) return;
+
+                const resolved = await resolveCryptoSymbols(tickers);
+                if (!cancelled) setSymbols(resolved);
             })
             .catch(() => {
                 /* leave chips in their symbol-only state */
@@ -70,10 +79,14 @@ export default function CryptoWatchlistManager({ initialItems, userId }: CryptoW
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [coinIdsKey]);
 
-    // Tickers for the TradingView widget; unresolved coins are skipped downstream.
-    const tickers = sortedItems
-        .map((item) => coins[item.symbol.toUpperCase()]?.symbol)
-        .filter((ticker): ticker is string => Boolean(ticker));
+    // Only symbols TradingView confirmed; unresolved coins are skipped by the widget.
+    const resolvedSymbols = sortedItems
+        .map((item) => {
+            const ticker = coins[item.symbol.toUpperCase()]?.symbol;
+            if (!ticker) return null;
+            return symbols[ticker.toUpperCase()] ?? null;
+        })
+        .filter((symbol): symbol is string => Boolean(symbol));
 
     return (
         <div className="space-y-6">
@@ -125,8 +138,8 @@ export default function CryptoWatchlistManager({ initialItems, userId }: CryptoW
 
             <div className="min-h-[550px]">
                 <TradingViewWatchlist
-                    symbols={tickers}
-                    formatSymbol={formatCryptoSymbolForTradingView}
+                    symbols={resolvedSymbols}
+                    formatSymbol={(symbol) => symbol}
                 />
             </div>
         </div>

@@ -1,6 +1,7 @@
 import { requireAdmin, getAdminEmails } from '@/lib/admin';
 import { getConfigView, SETTING_GROUPS } from '@/lib/config';
 import SettingsGroup from '@/components/settings/SettingsGroup';
+import NotificationActions from '@/components/settings/NotificationActions';
 
 export default async function SettingsPage() {
     await requireAdmin();
@@ -40,6 +41,8 @@ export default async function SettingsPage() {
                     );
                 })}
             </div>
+
+            <NotificationActions />
 
             <p className="text-xs text-gray-600">
                 Secrets are stored in MongoDB and never sent to the browser — only a masked

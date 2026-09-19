@@ -47,48 +47,48 @@ export default function CandidateRow({ rank, candidate, assetType, strategyId }:
 
     return (
         <div className="border-b border-gray-800/60 last:border-0">
-            <div className="flex items-center gap-3 px-4 py-3">
-                <span className="w-6 shrink-0 text-xs text-gray-600">{rank}</span>
+            <div className="flex items-center gap-2 px-3 py-2">
+                <span className="w-5 shrink-0 text-[11px] text-gray-600">{rank}</span>
 
                 <button
                     type="button"
                     onClick={() => setExpanded((v) => !v)}
-                    className="flex flex-1 items-center gap-2 text-left"
+                    className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
                     aria-expanded={expanded}
                 >
                     {expanded ? (
-                        <ChevronDown className="h-4 w-4 shrink-0 text-gray-500" />
+                        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-gray-500" />
                     ) : (
-                        <ChevronRight className="h-4 w-4 shrink-0 text-gray-500" />
+                        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-500" />
                     )}
-                    <span className="font-medium text-gray-100">{candidate.name}</span>
-                    <span className="text-xs text-gray-600">
-                        {candidate.matched}/{candidate.total} conditions
+                    <span className="truncate text-sm font-medium text-gray-100">{candidate.name}</span>
+                    <span className="shrink-0 text-[11px] text-gray-600">
+                        {candidate.matched}/{candidate.total}
                     </span>
                 </button>
 
-                <span className="hidden font-mono text-sm text-gray-300 sm:block">{price}</span>
+                <span className="hidden shrink-0 font-mono text-xs text-gray-300 sm:block">{price}</span>
 
                 {change !== null && change !== undefined ? (
                     <span
-                        className={`hidden text-xs font-medium sm:block ${
+                        className={`hidden shrink-0 text-[11px] font-medium sm:block ${
                             change >= 0 ? 'text-emerald-400' : 'text-red-400'
                         }`}
                     >
                         {change >= 0 ? '+' : ''}
-                        {change.toFixed(2)}%
+                        {change.toFixed(1)}%
                     </span>
                 ) : null}
 
                 <span
-                    className={`shrink-0 rounded-md border px-2 py-0.5 text-xs font-medium ${TIER_STYLES[candidate.tier]}`}
+                    className={`shrink-0 rounded border px-1.5 py-0.5 text-[11px] font-medium ${TIER_STYLES[candidate.tier]}`}
                 >
                     {candidate.score}
                 </span>
             </div>
 
             {expanded ? (
-                <div className="space-y-3 bg-black/30 px-4 pb-4 pt-1">
+                <div className="space-y-2 bg-black/30 px-3 pb-3 pt-1">
                     <ul className="space-y-1.5">
                         {candidate.passed.map((criterion) => (
                             <li key={criterion.label} className="flex items-start gap-2 text-xs">
