@@ -35,43 +35,58 @@ export async function updateSettings(
 
 /** Verify a provider's credentials by making a minimal request. */
 export async function testProvider(
-    provider: 'deepseek' | 'gemini' | 'minimax' | 'siray' | 'finnhub' | 'coingecko' | 'telegram'
+    provider:
+        | 'deepseek'
+        | 'gemini'
+        | 'minimax'
+        | 'siray'
+        | 'finnhub'
+        | 'coingecko'
+        | 'telegram-stocks'
+        | 'telegram-crypto'
+        | 'telegram-shared'
 ): Promise<{ ok: boolean; message: string }> {
     if (!(await isCurrentUserAdmin())) {
         return { ok: false, message: 'Not authorised.' };
     }
 
     try {
-        if (provider === 'telegram') {
-            const { getTelegramMe, getTelegramConfig, sendTelegramMessage } = await import('@/lib/telegram');
+        if (provider.startsWith('telegram')) {
+            const { getTelegramMe, getTelegramConfig, sendTelegramMessage, resolveChatId } = await import(
+                '@/lib/telegram'
+            );
             const config = await getTelegramConfig();
 
-            const me = await getTelegramMe();
+            const audience =
+                provider === 'telegram-crypto' ? 'crypto' : provider === 'telegram-stocks' ? 'stocks' : undefined;
+
+            // Validate the token for THIS bot. With two bots configured, one working says
+            // nothing about the other, so each is checked on its own.
+            const me = await getTelegramMe(audience);
             if (!me.ok) {
-                return { ok: false, message: `Bot token rejected: ${me.error}` };
+                return { ok: false, message: `Token rejected: ${me.error}` };
             }
 
-            // Validate each configured chat separately — a wrong chat id is the most common
-            // setup error, and one chat working says nothing about the other.
-            const results: string[] = [];
-            for (const audience of ['stocks', 'crypto'] as const) {
-                const chatId = audience === 'crypto' ? config.cryptoChatId : config.stockChatId;
-                if (!chatId) {
-                    results.push(`${audience}: not configured`);
-                    continue;
-                }
-                const sent = await sendTelegramMessage(
-                    `OpenStock test message (${audience}). If you can read this, alerts will arrive here.`,
-                    { audience, config }
-                );
-                results.push(`${audience}: ${sent.ok ? 'sent' : sent.error}`);
+            if (!audience) {
+                return { ok: true, message: `Shared bot @${me.username} is valid.` };
             }
 
-            const anyFailed = results.some((line) => !line.includes('sent') && !line.includes('not configured'));
-            return {
-                ok: !anyFailed,
-                message: `Bot @${me.username ?? 'unknown'} — ${results.join('; ')}`,
-            };
+            const chatId = resolveChatId(config, audience);
+            if (!chatId) {
+                return {
+                    ok: false,
+                    message: `@${me.username} is valid, but no ${audience} chat id is set yet.`,
+                };
+            }
+
+            const sent = await sendTelegramMessage(
+                `OpenStock test message (${audience}). If you can read this, alerts will arrive here.`,
+                { audience, config }
+            );
+
+            return sent.ok
+                ? { ok: true, message: `@${me.username} sent a test message to the ${audience} chat.` }
+                : { ok: false, message: `@${me.username} token is valid, but the send failed: ${sent.error}` };
         }
 
         if (provider === 'finnhub') {
@@ -91,7 +106,15 @@ export async function testProvider(
         }
 
         const { callAIProvider } = await import('@/lib/ai-provider');
-        const reply = await callAIProvider('Reply with the single word: ok', provider);
+        const { AI_PROVIDER_NAMES } = await import('@/lib/ai-provider');
+
+        // Narrowed explicitly: TypeScript cannot infer that the telegram branches returned,
+        // and telegram ids are not provider names.
+        if (!AI_PROVIDER_NAMES.includes(provider as never)) {
+            return { ok: false, message: `Unknown provider: ${provider}` };
+        }
+
+        const reply = await callAIProvider('Reply with the single word: ok', provider as never);
         return { ok: true, message: `${provider} responded: "${reply.trim().slice(0, 60)}"` };
     } catch (error) {
         return {
@@ -102,23 +125,25 @@ export async function testProvider(
 }
 
 /**
- * Lists the chats that have recently messaged the bot, so a chat id can be copied instead of
- * guessed. This is the fix for the usual "chat not found" setup error.
+ * Lists the chats that have recently messaged the given bot, so a chat id can be copied
+ * instead of guessed. This is the fix for the usual "chat not found" setup error.
  */
-export async function discoverTelegramChats(): Promise<{ ok: boolean; chats?: { id: string; label: string }[]; message: string }> {
+export async function discoverTelegramChats(
+    audience: 'stocks' | 'crypto' = 'stocks'
+): Promise<{ ok: boolean; chats?: { id: string; label: string }[]; message: string }> {
     if (!(await isCurrentUserAdmin())) {
         return { ok: false, message: 'Not authorised.' };
     }
 
     const { getTelegramUpdates } = await import('@/lib/telegram');
-    const result = await getTelegramUpdates();
+    const result = await getTelegramUpdates(audience);
 
     if (!result.ok) return { ok: false, message: result.error ?? 'Could not reach Telegram.' };
     if (!result.chats || result.chats.length === 0) {
         return {
             ok: true,
             chats: [],
-            message: 'No chats found. Send any message to your bot in Telegram first, then try again.',
+            message: `No chats found for the ${audience} bot. Send it any message in Telegram first, then try again.`,
         };
     }
 

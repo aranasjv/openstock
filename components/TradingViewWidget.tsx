@@ -11,11 +11,24 @@ interface TradingViewWidgetProps {
     scriptUrl: string;
     config: Record<string, unknown>;
     height?: number;
+    /**
+     * Fill the parent container instead of using a fixed pixel height. Use when the widget
+     * sits in a grid cell whose height is set by the layout, so panels in the same row match.
+     */
+    fill?: boolean;
     className?: string;
     allowExpand?: boolean;
 }
 
-const TradingViewWidget = ({ title, scriptUrl, config, height = 600, className, allowExpand = false }: TradingViewWidgetProps) => {
+const TradingViewWidget = ({
+    title,
+    scriptUrl,
+    config,
+    height = 600,
+    fill = false,
+    className,
+    allowExpand = false,
+}: TradingViewWidgetProps) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [windowHeight, setWindowHeight] = useState(0);
 
@@ -37,6 +50,7 @@ const TradingViewWidget = ({ title, scriptUrl, config, height = 600, className, 
         autosize: true,
     };
 
+    const grows = fill || isExpanded;
     const containerRef = useTradingViewWidget(scriptUrl, widgetConfig, currentHeight);
 
     const toggleExpand = () => {
@@ -44,9 +58,17 @@ const TradingViewWidget = ({ title, scriptUrl, config, height = 600, className, 
     };
 
     return (
-        <div className={cn("w-full transition-all duration-300", isExpanded && "fixed inset-0 z-[9999] bg-background")}>
-            <div className={cn("w-full relative group", isExpanded && "h-full w-full")}>
-                {title && !isExpanded && <h3 className="font-semibold text-2xl text-gray-100 mb-5">{title}</h3>}
+        <div
+            className={cn(
+                "w-full transition-all duration-300",
+                fill && !isExpanded && "h-full min-h-0",
+                isExpanded && "fixed inset-0 z-[9999] bg-background"
+            )}
+        >
+            <div className={cn("w-full relative group", grows && "h-full flex flex-col")}>
+                {title && !isExpanded && (
+                    <h3 className="shrink-0 text-sm font-semibold text-gray-200 mb-2">{title}</h3>
+                )}
 
                 {allowExpand && (
                     <Button
@@ -63,8 +85,20 @@ const TradingViewWidget = ({ title, scriptUrl, config, height = 600, className, 
                     </Button>
                 )}
 
-                <div className={cn('tradingview-widget-container', className, isExpanded && "h-full")} ref={containerRef}>
-                    <div className="tradingview-widget-container__widget" style={{ height: currentHeight, width: "100%" }} />
+                <div
+                    className={cn(
+                        'tradingview-widget-container',
+                        className,
+                        // The hook renders the widget at 100% height when autosize is on, so
+                        // this container is what actually determines the rendered size.
+                        grows && "h-full min-h-0 overflow-hidden rounded-xl"
+                    )}
+                    ref={containerRef}
+                >
+                    <div
+                        className="tradingview-widget-container__widget"
+                        style={{ height: grows ? '100%' : currentHeight, width: "100%" }}
+                    />
                 </div>
             </div>
         </div>

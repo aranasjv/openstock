@@ -4,7 +4,7 @@ import { connectToDatabase } from '@/database/mongoose';
 import { loadConfig } from '@/lib/config';
 import { runScreener } from '@/lib/actions/screener.actions';
 import { getPortfolioSummary } from '@/lib/actions/holdings.actions';
-import { sendTelegramMessage } from '@/lib/telegram';
+import { getTelegramConfig, sendTelegramMessage } from '@/lib/telegram';
 import { buildDigestMessages, type DigestPick } from '@/lib/notifications';
 import { getStrategy, isStrategyId, DEFAULT_STRATEGY_ID } from '@/lib/strategies';
 import { formatCryptoPrice, formatPrice } from '@/lib/utils';
@@ -87,15 +87,17 @@ export async function runDailyDigest(): Promise<DigestResult> {
         });
 
         const sent = { stocks: false, crypto: false };
+        // Resolved once, and passed explicitly so both sends use the same snapshot.
+        const telegramConfig = await getTelegramConfig();
 
         if (wantStocks) {
-            const result = await sendTelegramMessage(messages.stocks, { audience: 'stocks', config });
+            const result = await sendTelegramMessage(messages.stocks, { audience: 'stocks', config: telegramConfig });
             sent.stocks = result.ok;
             if (!result.ok) console.error(`Digest to stocks chat failed: ${result.error}`);
         }
 
         if (wantCrypto) {
-            const result = await sendTelegramMessage(messages.crypto, { audience: 'crypto', config });
+            const result = await sendTelegramMessage(messages.crypto, { audience: 'crypto', config: telegramConfig });
             sent.crypto = result.ok;
             if (!result.ok) console.error(`Digest to crypto chat failed: ${result.error}`);
         }

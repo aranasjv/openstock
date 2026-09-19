@@ -42,6 +42,8 @@ export interface ScreenerCandidate {
     failed: Criterion[];
     matched: number;
     total: number;
+    /** Exposed so the UI can flag overbought/oversold conditions at a glance. */
+    rsi14: number | null;
 }
 
 export interface ScreenerResult {
@@ -216,6 +218,7 @@ export async function runScreener(
                 failed: result.failed,
                 matched: result.matched,
                 total: result.total,
+                rsi14: bundle.rsi14,
             };
             return candidate;
         } catch (error) {

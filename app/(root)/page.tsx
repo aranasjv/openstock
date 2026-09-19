@@ -14,10 +14,12 @@ interface HomeProps {
 /**
  * Compact dashboard layout.
  *
- * Everything is deliberately sized to fit one screen: four widgets at 300px in a 3-column
- * grid, with the Must Buy list scrolling inside its own panel rather than growing the page.
+ * The shell is viewport-height, and this page fills it: a fixed widget row plus a flexible
+ * row that takes whatever is left. Panels in the second row share that height, and each
+ * scrolls internally — so the page itself never scrolls, and the two panels are always the
+ * same height regardless of how much content they hold.
  */
-const WIDGET_HEIGHT = 300;
+const WIDGET_HEIGHT = 280;
 
 const Home = async ({ searchParams }: HomeProps) => {
     const { strategy } = await searchParams;
@@ -25,7 +27,7 @@ const Home = async ({ searchParams }: HomeProps) => {
 
     return (
         <div className="flex h-full flex-col gap-3 p-3">
-            <section className="grid w-full shrink-0 gap-3 xl:grid-cols-3">
+            <section className="grid shrink-0 gap-3 xl:grid-cols-3">
                 <TradingViewWidget
                     title="Market Overview"
                     scriptUrl={`${scriptUrl}market-overview.js`}
@@ -47,16 +49,18 @@ const Home = async ({ searchParams }: HomeProps) => {
                 />
             </section>
 
-            <section className="grid min-h-[340px] w-full flex-1 gap-3 xl:grid-cols-3">
-                <div className="min-h-0 xl:col-span-2">
+            <section className="grid min-h-0 flex-1 gap-3 xl:grid-cols-3">
+                <div className="h-full min-h-0 xl:col-span-2">
                     <MustBuySection assetType="stock" strategyId={strategy} />
                 </div>
-                <TradingViewWidget
-                    title="Top Stories"
-                    scriptUrl={`${scriptUrl}timeline.js`}
-                    config={TOP_STORIES_WIDGET_CONFIG}
-                    height={WIDGET_HEIGHT}
-                />
+                <div className="h-full min-h-0">
+                    <TradingViewWidget
+                        title="Top Stories"
+                        scriptUrl={`${scriptUrl}timeline.js`}
+                        config={TOP_STORIES_WIDGET_CONFIG}
+                        fill
+                    />
+                </div>
             </section>
         </div>
     )

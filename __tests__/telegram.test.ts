@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import http from 'node:http';
 import { escapeTelegramHtml } from '@/lib/telegram';
 
@@ -45,18 +45,25 @@ afterAll(async () => {
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 
+// Recorded requests accumulate across tests otherwise, so assertions on recorded[0] would
+// read a leftover call from a previous test.
+beforeEach(() => {
+  recorded = [];
+});
+
 let configValues: Record<string, string> = {};
 
 vi.mock('@/lib/config', () => ({
   loadConfig: async () => configValues,
 }));
 
-const { sendTelegramMessage, getTelegramConfig, getTelegramMe, getTelegramUpdates, isTelegramConfigured } =
+const { sendTelegramMessage, getTelegramConfig, getTelegramMe, getTelegramUpdates, isTelegramConfigured, resolveBotToken } =
   await import('@/lib/telegram');
 
 function configure(overrides: Record<string, string> = {}) {
   configValues = {
-    TELEGRAM_BOT_TOKEN: '123456:TEST-TOKEN',
+    TELEGRAM_STOCK_BOT_TOKEN: '111:STOCK-BOT',
+    TELEGRAM_CRYPTO_BOT_TOKEN: '222:CRYPTO-BOT',
     TELEGRAM_STOCK_CHAT_ID: '-100111',
     TELEGRAM_CRYPTO_CHAT_ID: '-200222',
     TELEGRAM_API_BASE_URL: `http://127.0.0.1:${port}`,
@@ -90,20 +97,46 @@ describe('audience routing', () => {
     respondWith = { status: 200, body: { ok: true, result: { message_id: 1 } } };
   });
 
-  it('sends stock messages to the stock chat', async () => {
+  it('sends stock messages with the stock bot to the stock chat', async () => {
     configure();
     await sendTelegramMessage('stock message', { audience: 'stocks' });
 
     expect(recorded).toHaveLength(1);
-    expect(recorded[0].url).toBe('/bot123456:TEST-TOKEN/sendMessage');
+    expect(recorded[0].url).toBe('/bot111:STOCK-BOT/sendMessage');
     expect(recorded[0].body.chat_id).toBe('-100111');
   });
 
-  it('sends crypto messages to the crypto chat', async () => {
+  it('sends crypto messages with the crypto bot to the crypto chat', async () => {
     configure();
     await sendTelegramMessage('crypto message', { audience: 'crypto' });
 
+    // Separate bots, not just separate chats — the whole point of per-audience tokens.
+    expect(recorded[0].url).toBe('/bot222:CRYPTO-BOT/sendMessage');
     expect(recorded[0].body.chat_id).toBe('-200222');
+  });
+
+  it('falls back to the shared token when a per-audience bot is not set', async () => {
+    configure({ TELEGRAM_CRYPTO_BOT_TOKEN: '', TELEGRAM_BOT_TOKEN: '999:SHARED' });
+    await sendTelegramMessage('crypto message', { audience: 'crypto' });
+
+    expect(recorded[0].url).toBe('/bot999:SHARED/sendMessage');
+    expect(recorded[0].body.chat_id).toBe('-200222');
+  });
+
+  it('prefers the per-audience bot over the shared token', async () => {
+    configure({ TELEGRAM_BOT_TOKEN: '999:SHARED' });
+    await sendTelegramMessage('stock message', { audience: 'stocks' });
+
+    expect(recorded[0].url).toBe('/bot111:STOCK-BOT/sendMessage');
+  });
+
+  it('reports which audience is unconfigured', async () => {
+    configure({ TELEGRAM_CRYPTO_BOT_TOKEN: '', TELEGRAM_BOT_TOKEN: '' });
+    const result = await sendTelegramMessage('x', { audience: 'crypto' });
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('crypto is not configured');
+    expect(recorded).toHaveLength(0);
   });
 
   it('uses HTML parse mode and disables link previews', async () => {
@@ -119,7 +152,7 @@ describe('audience routing', () => {
     const result = await sendTelegramMessage('x', { audience: 'crypto' });
 
     expect(result.ok).toBe(false);
-    expect(result.error).toContain('crypto chat is not configured');
+    expect(result.error).toContain('crypto is not configured');
     expect(recorded).toHaveLength(0);
   });
 
@@ -142,11 +175,24 @@ describe('audience routing', () => {
   });
 });
 
+describe('resolveBotToken', () => {
+  it('prefers the audience token, then the shared one', async () => {
+    configure({ TELEGRAM_BOT_TOKEN: 'shared' });
+    const config = await getTelegramConfig();
+
+    expect(resolveBotToken(config, 'stocks')).toBe('111:STOCK-BOT');
+    expect(resolveBotToken(config, 'crypto')).toBe('222:CRYPTO-BOT');
+
+    const noAudienceToken = { ...config, stockBotToken: '' };
+    expect(resolveBotToken(noAudienceToken, 'stocks')).toBe('shared');
+  });
+});
+
 describe('enable flag', () => {
-  it('does not send when disabled, without clearing the token', async () => {
+  it('does not send when disabled, without clearing the tokens', async () => {
     configure({ TELEGRAM_ENABLED: 'false' });
     const config = await getTelegramConfig();
-    expect(config.token).toBe('123456:TEST-TOKEN');
+    expect(config.stockBotToken).toBe('111:STOCK-BOT');
     expect(isTelegramConfigured(config)).toBe(false);
 
     const result = await sendTelegramMessage('x', { audience: 'stocks' });
@@ -156,23 +202,51 @@ describe('enable flag', () => {
 
     configure();
   });
+
+  it('treats an audience as configured only when it has both token and chat', async () => {
+    configure({ TELEGRAM_CRYPTO_CHAT_ID: '' });
+    const config = await getTelegramConfig();
+
+    expect(isTelegramConfigured(config, 'stocks')).toBe(true);
+    expect(isTelegramConfigured(config, 'crypto')).toBe(false);
+  });
 });
 
 describe('getTelegramMe', () => {
-  it('returns the bot username', async () => {
+  it('validates the requested audience bot', async () => {
     configure();
-    respondWith = { status: 200, body: { ok: true, result: { username: 'openstock_bot' } } };
+    respondWith = { status: 200, body: { ok: true, result: { username: 'stock_bot' } } };
 
-    const result = await getTelegramMe();
+    const result = await getTelegramMe('stocks');
     expect(result.ok).toBe(true);
-    expect(result.username).toBe('openstock_bot');
+    expect(result.username).toBe('stock_bot');
+    // The audience's own bot is the one checked.
+    expect(recorded[0].url).toBe('/bot111:STOCK-BOT/getMe');
+  });
+
+  it('checks the crypto bot when asked for crypto', async () => {
+    configure();
+    respondWith = { status: 200, body: { ok: true, result: { username: 'crypto_bot' } } };
+
+    await getTelegramMe('crypto');
+    expect(recorded[0].url).toBe('/bot222:CRYPTO-BOT/getMe');
+  });
+
+  it('reports a missing token rather than calling out', async () => {
+    configure({ TELEGRAM_CRYPTO_BOT_TOKEN: '', TELEGRAM_BOT_TOKEN: '' });
+    recorded = [];
+
+    const result = await getTelegramMe('crypto');
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('No bot token configured');
+    expect(recorded).toHaveLength(0);
   });
 
   it('surfaces an invalid token', async () => {
     configure();
     respondWith = { status: 401, body: { ok: false, description: 'Unauthorized' } };
 
-    const result = await getTelegramMe();
+    const result = await getTelegramMe('stocks');
     expect(result.ok).toBe(false);
     expect(result.error).toBe('Unauthorized');
   });
@@ -195,7 +269,7 @@ describe('getTelegramUpdates', () => {
       },
     };
 
-    const result = await getTelegramUpdates();
+    const result = await getTelegramUpdates('stocks');
     expect(result.ok).toBe(true);
     expect(result.chats).toHaveLength(3);
     expect(result.chats).toContainEqual({ id: '-100', label: 'Stock Alerts' });
@@ -203,11 +277,19 @@ describe('getTelegramUpdates', () => {
     expect(result.chats).toContainEqual({ id: '-300', label: 'cryptochat' });
   });
 
+  it('queries the bot for the requested audience', async () => {
+    configure();
+    respondWith = { status: 200, body: { ok: true, result: [] } };
+
+    await getTelegramUpdates('crypto');
+    expect(recorded[0].url).toBe('/bot222:CRYPTO-BOT/getUpdates');
+  });
+
   it('ignores updates with no chat', async () => {
     configure();
     respondWith = { status: 200, body: { ok: true, result: [{}, { message: {} }] } };
 
-    const result = await getTelegramUpdates();
+    const result = await getTelegramUpdates('stocks');
     expect(result.ok).toBe(true);
     expect(result.chats).toHaveLength(0);
   });

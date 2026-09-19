@@ -39,7 +39,13 @@ export function escapeTelegramHtml(text: string): string {
 }
 
 export interface TelegramConfig {
-    token: string;
+    /**
+     * Optional shared token, used only when a per-audience token is not set. Kept so a setup
+     * that previously used one bot keeps working.
+     */
+    sharedToken: string;
+    stockBotToken: string;
+    cryptoBotToken: string;
     stockChatId: string;
     cryptoChatId: string;
     enabled: boolean;
@@ -50,7 +56,9 @@ export interface TelegramConfig {
 export async function getTelegramConfig(): Promise<TelegramConfig> {
     const config = await loadConfig();
     return {
-        token: config.TELEGRAM_BOT_TOKEN || '',
+        sharedToken: config.TELEGRAM_BOT_TOKEN || '',
+        stockBotToken: config.TELEGRAM_STOCK_BOT_TOKEN || '',
+        cryptoBotToken: config.TELEGRAM_CRYPTO_BOT_TOKEN || '',
         stockChatId: config.TELEGRAM_STOCK_CHAT_ID || '',
         cryptoChatId: config.TELEGRAM_CRYPTO_CHAT_ID || '',
         enabled: (config.TELEGRAM_ENABLED || 'true') !== 'false',
@@ -58,29 +66,43 @@ export async function getTelegramConfig(): Promise<TelegramConfig> {
     };
 }
 
-/** A recipient is usable when the bot token and that audience's chat id are both set. */
+/**
+ * The token for an audience: its own bot if configured, otherwise the shared fallback.
+ * Stocks and crypto are commonly run as two separate bots so each chat is fed by a bot the
+ * user controls independently.
+ */
+export function resolveBotToken(config: TelegramConfig, audience: TelegramAudience): string {
+    return audience === 'crypto'
+        ? config.cryptoBotToken || config.sharedToken
+        : config.stockBotToken || config.sharedToken;
+}
+
+/** A recipient is usable when that audience has both a bot token and a chat id. */
 export function resolveChatId(config: TelegramConfig, audience: TelegramAudience): string {
     return audience === 'crypto' ? config.cryptoChatId : config.stockChatId;
 }
 
 export function isTelegramConfigured(config: TelegramConfig, audience?: TelegramAudience): boolean {
-    if (!config.enabled || !config.token) return false;
-    if (audience) return Boolean(resolveChatId(config, audience));
-    return Boolean(config.stockChatId || config.cryptoChatId);
+    if (!config.enabled) return false;
+    if (audience) {
+        return Boolean(resolveBotToken(config, audience) && resolveChatId(config, audience));
+    }
+    return (['stocks', 'crypto'] as const).some((a) => Boolean(resolveBotToken(config, a) && resolveChatId(config, a)));
 }
 
 async function callTelegram<T>(
     method: string,
-    config: TelegramConfig,
+    token: string,
+    apiBase: string,
     payload?: Record<string, unknown>
 ): Promise<{ ok: boolean; result?: T; error?: string }> {
-    if (!config.token) return { ok: false, error: 'Telegram bot token is not configured.' };
+    if (!token) return { ok: false, error: 'Telegram bot token is not configured.' };
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
     try {
-        const res = await fetch(`${config.apiBase}/bot${config.token}/${method}`, {
+        const res = await fetch(`${apiBase}/bot${token}/${method}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload ?? {}),
@@ -98,10 +120,23 @@ async function callTelegram<T>(
 
         return { ok: true, result: data.result as T };
     } catch (error) {
-        return {
-            ok: false,
-            error: error instanceof Error ? error.message : 'Telegram request failed.',
-        };
+        const cause = (error as { cause?: { code?: string } })?.cause?.code;
+        const message = error instanceof Error ? error.message : 'Telegram request failed.';
+
+        // A network block is worth naming explicitly. "fetch failed" reads like a bad token,
+        // and this project's diagnostics showed exactly that: Telegram reachable over IPv6 but
+        // hanging over IPv4 (TCP connects, then TLS never completes), while a container with
+        // no IPv6 route can only try IPv4.
+        if (cause === 'ETIMEDOUT' || cause === 'ECONNRESET' || cause === 'UND_ERR_CONNECT_TIMEOUT') {
+            return {
+                ok: false,
+                error:
+                    `Cannot reach ${apiBase} (${cause}). This is a network problem, not a bad token. ` +
+                    `If a network blocks Telegram, point TELEGRAM_API_BASE_URL at a proxy that can reach it.`,
+            };
+        }
+
+        return { ok: false, error: message };
     } finally {
         clearTimeout(timeout);
     }
@@ -122,14 +157,16 @@ export async function sendTelegramMessage(
     }
 
     const chatId = resolveChatId(config, options.audience);
-    if (!config.token || !chatId) {
+    const token = resolveBotToken(config, options.audience);
+
+    if (!token || !chatId) {
         return {
             ok: false,
-            error: `Telegram ${options.audience} chat is not configured (token and chat id required).`,
+            error: `Telegram ${options.audience} is not configured (bot token and chat id required).`,
         };
     }
 
-    const result = await callTelegram<{ message_id: number }>('sendMessage', config, {
+    const result = await callTelegram<{ message_id: number }>('sendMessage', token, config.apiBase, {
         chat_id: chatId,
         text,
         parse_mode: 'HTML',
@@ -141,12 +178,24 @@ export async function sendTelegramMessage(
         : { ok: false, error: result.error };
 }
 
-/** Validates the bot token. Used by the settings "Test" button. */
-export async function getTelegramMe(): Promise<{ ok: boolean; username?: string; error?: string }> {
+/**
+ * Validates a bot token. Used by the settings "Test" button.
+ * Pass an audience to check that specific bot; omit it to check the shared fallback.
+ */
+export async function getTelegramMe(
+    audience?: TelegramAudience
+): Promise<{ ok: boolean; username?: string; error?: string }> {
     const config = await getTelegramConfig();
+    const token = audience ? resolveBotToken(config, audience) : config.sharedToken;
+
+    if (!token) {
+        return { ok: false, error: `No bot token configured${audience ? ` for ${audience}` : ''}.` };
+    }
+
     const result = await callTelegram<{ username?: string; first_name?: string }>(
         'getMe',
-        config
+        token,
+        config.apiBase
     );
 
     return result.ok
@@ -158,15 +207,21 @@ export async function getTelegramMe(): Promise<{ ok: boolean; username?: string;
  * Recent updates for this bot, used to discover a chat id: message the bot, then read the
  * id back. This is the fix for the most common setup error.
  */
-export async function getTelegramUpdates(): Promise<{
+export async function getTelegramUpdates(audience: TelegramAudience = 'stocks'): Promise<{
     ok: boolean;
     chats?: { id: string; label: string }[];
     error?: string;
 }> {
     const config = await getTelegramConfig();
+    const token = resolveBotToken(config, audience);
+
+    if (!token) {
+        return { ok: false, error: `No bot token configured for ${audience}.` };
+    }
+
     const result = await callTelegram<
         { message?: { chat?: { id: number; title?: string; username?: string; first_name?: string } } }[]
-    >('getUpdates', config);
+    >('getUpdates', token, config.apiBase);
 
     if (!result.ok) return { ok: false, error: result.error };
 

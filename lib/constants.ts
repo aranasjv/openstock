@@ -212,7 +212,9 @@ export const CANDLE_CHART_WIDGET_CONFIG = (symbol: string) => ({
     watchlist: [],
     withdateranges: false,
     compareSymbols: [],
-    studies: [],
+    // RSI and MACD are shown by default so momentum and overbought/oversold conditions are
+    // visible without the user adding studies manually.
+    studies: ['RSI@tv-basicstudies', 'MACD@tv-basicstudies'],
     width: '100%',
     height: 600,
 });

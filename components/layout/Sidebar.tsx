@@ -31,13 +31,55 @@ export default async function Sidebar({ user }: { user: User }) {
         runScreener('crypto', strategyId),
     ]);
 
-    // Top picks across both markets, so the sidebar reflects everything at a glance.
-    const topPicks = [...stockResult.candidates, ...cryptoResult.candidates]
+    // One list per market. Previously these were merged and sorted by score, which meant
+    // stocks (whose conditions are easier to satisfy in full) crowded crypto out entirely.
+    const topStocks = stockResult.candidates
         .filter((candidate) => candidate.matched > 0)
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 3);
+        .slice(0, 2);
+    const topCrypto = cryptoResult.candidates
+        .filter((candidate) => candidate.matched > 0)
+        .slice(0, 2);
 
     const pnlPositive = portfolio.totalPnl >= 0;
+
+    const PickRows = ({
+        picks,
+        isCrypto,
+    }: {
+        picks: { symbol: string; price: number; score: number; tier: string }[];
+        isCrypto: boolean;
+    }) =>
+        picks.length > 0 ? (
+            <ul className="mt-1 space-y-1">
+                {picks.map((pick) => (
+                    <li key={pick.symbol} className="flex items-center justify-between gap-1.5">
+                        <Link
+                            href={isCrypto ? `/crypto/${pick.symbol}` : `/stocks/${pick.symbol}`}
+                            className="truncate text-[11px] text-gray-300 hover:text-teal-300"
+                            title={pick.symbol}
+                        >
+                            {pick.symbol}
+                        </Link>
+                        <span className="shrink-0 font-mono text-[10px] text-gray-600">
+                            {isCrypto ? formatCryptoPrice(pick.price) : formatPrice(pick.price)}
+                        </span>
+                        <span
+                            className={`shrink-0 rounded px-1 text-[10px] ${
+                                pick.tier === 'Strong'
+                                    ? 'bg-emerald-950/60 text-emerald-300'
+                                    : pick.tier === 'Moderate'
+                                        ? 'bg-teal-950/60 text-teal-300'
+                                        : 'bg-gray-800 text-gray-400'
+                            }`}
+                        >
+                            {pick.score}
+                        </span>
+                    </li>
+                ))}
+            </ul>
+        ) : (
+            <p className="mt-1 text-[10px] text-gray-700">No matches</p>
+        );
 
     return (
         <aside className="hidden w-60 shrink-0 flex-col border-r border-gray-800 bg-black lg:flex">
@@ -71,7 +113,7 @@ export default async function Sidebar({ user }: { user: User }) {
                     ) : null}
                 </div>
 
-                {/* Top must-buy picks */}
+                {/* Top must-buy picks, split by market so both are always represented. */}
                 <div className="mt-3 rounded-lg border border-gray-800 bg-gray-900/40 p-3">
                     <div className="flex items-center justify-between">
                         <span className="text-[10px] uppercase tracking-wider text-gray-600">
@@ -82,44 +124,22 @@ export default async function Sidebar({ user }: { user: User }) {
                         </span>
                     </div>
 
-                    {topPicks.length > 0 ? (
-                        <ul className="mt-2 space-y-1.5">
-                            {topPicks.map((pick) => {
-                                const isCrypto = cryptoResult.candidates.some(
-                                    (candidate) => candidate.symbol === pick.symbol
-                                );
-                                return (
-                                    <li key={`${isCrypto ? 'c' : 's'}-${pick.symbol}`} className="flex items-center justify-between gap-2">
-                                        <Link
-                                            href={isCrypto ? `/crypto/${pick.symbol}` : `/stocks/${pick.symbol}`}
-                                            className="truncate text-xs text-gray-300 hover:text-teal-300"
-                                        >
-                                            {pick.symbol}
-                                        </Link>
-                                        <span className="shrink-0 font-mono text-[11px] text-gray-500">
-                                            {isCrypto ? formatCryptoPrice(pick.price) : formatPrice(pick.price)}
-                                        </span>
-                                        <span
-                                            className={`shrink-0 rounded px-1 text-[10px] ${
-                                                pick.tier === 'Strong'
-                                                    ? 'bg-emerald-950/60 text-emerald-300'
-                                                    : pick.tier === 'Moderate'
-                                                        ? 'bg-teal-950/60 text-teal-300'
-                                                        : 'bg-gray-800 text-gray-400'
-                                            }`}
-                                        >
-                                            {pick.score}
-                                        </span>
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                    ) : (
-                        <p className="mt-2 text-[11px] text-gray-600">No matches right now.</p>
-                    )}
+                    <div className="mt-2">
+                        <div className="text-[10px] font-medium uppercase tracking-wider text-gray-700">
+                            Stocks
+                        </div>
+                        <PickRows picks={topStocks} isCrypto={false} />
+                    </div>
+
+                    <div className="mt-2.5">
+                        <div className="text-[10px] font-medium uppercase tracking-wider text-gray-700">
+                            Crypto
+                        </div>
+                        <PickRows picks={topCrypto} isCrypto />
+                    </div>
                 </div>
 
-                <div className="mt-auto pt-4">
+                <div className="mt-auto space-y-2 pt-4">
                     <Link
                         href="/settings"
                         className="block truncate rounded-md px-2 py-1.5 text-xs text-gray-500 hover:bg-white/5 hover:text-gray-300"
@@ -127,6 +147,43 @@ export default async function Sidebar({ user }: { user: User }) {
                         {user.name}
                         <span className="block truncate text-[10px] text-gray-600">{user.email}</span>
                     </Link>
+
+                    {/*
+                     * Secondary links. These lived in a large footer that took a big block on
+                     * every page; folding them into two compact rows keeps /about, /help and
+                     * /terms reachable without costing page height.
+                     */}
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 px-2 text-[10px] text-gray-600">
+                        <Link href="/about" className="hover:text-gray-400">About</Link>
+                        <Link href="/help" className="hover:text-gray-400">Help</Link>
+                        <Link href="/terms" className="hover:text-gray-400">Terms</Link>
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 px-2 text-[10px] text-gray-700">
+                        <a
+                            href="https://github.com/Open-Dev-Society/OpenStock"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:text-gray-500"
+                        >
+                            GitHub
+                        </a>
+                        <a
+                            href="https://discord.gg/JkJ8kfxgxB"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:text-gray-500"
+                        >
+                            Discord
+                        </a>
+                        <a
+                            href="https://www.linkedin.com/company/opendevsociety-in/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:text-gray-500"
+                        >
+                            LinkedIn
+                        </a>
+                    </div>
                 </div>
             </div>
         </aside>

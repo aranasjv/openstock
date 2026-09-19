@@ -20,6 +20,20 @@ const TIER_STYLES: Record<string, string> = {
     Watch: 'bg-gray-800/60 text-gray-400 border-gray-700',
 };
 
+/**
+ * RSI banding, so an overbought/oversold condition is visible without expanding the row or
+ * applying a strategy that looks for it.
+ */
+function rsiBand(rsi: number | null): { label: string; className: string; tone: string } | null {
+    if (rsi === null || !Number.isFinite(rsi)) return null;
+
+    const label = `RSI ${rsi.toFixed(0)}`;
+    if (rsi <= 30) return { label, className: 'bg-emerald-950/60 text-emerald-300', tone: 'Oversold' };
+    if (rsi <= 40) return { label, className: 'bg-emerald-950/30 text-emerald-400/80', tone: 'Approaching oversold' };
+    if (rsi >= 70) return { label, className: 'bg-red-950/50 text-red-300', tone: 'Overbought' };
+    return { label, className: 'text-gray-600', tone: 'Neutral' };
+}
+
 export default function CandidateRow({ rank, candidate, assetType, strategyId }: CandidateRowProps) {
     const [expanded, setExpanded] = useState(false);
     const [pending, startTransition] = useTransition();
@@ -29,6 +43,7 @@ export default function CandidateRow({ rank, candidate, assetType, strategyId }:
 
     const price = assetType === 'crypto' ? formatCryptoPrice(candidate.price) : formatPrice(candidate.price);
     const change = candidate.changePercent24h;
+    const rsi = rsiBand(candidate.rsi14);
 
     const handleExplain = () => {
         startTransition(async () => {
@@ -68,6 +83,15 @@ export default function CandidateRow({ rank, candidate, assetType, strategyId }:
                 </button>
 
                 <span className="hidden shrink-0 font-mono text-xs text-gray-300 sm:block">{price}</span>
+
+                {rsi ? (
+                    <span
+                        className={`hidden shrink-0 rounded px-1 text-[10px] font-medium md:block ${rsi.className}`}
+                        title={rsi.tone}
+                    >
+                        {rsi.label}
+                    </span>
+                ) : null}
 
                 {change !== null && change !== undefined ? (
                     <span

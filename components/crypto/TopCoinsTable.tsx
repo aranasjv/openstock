@@ -1,103 +1,123 @@
-import Image from "next/image";
-import Link from "next/link";
-import { formatCryptoPrice, formatCompactNumber, formatMarketCapValue } from "@/lib/utils";
+'use client';
+
+import { useState } from 'react';
+import Image from 'next/image';
+import { ChevronRight } from 'lucide-react';
+import CoinDetailDrawer from './CoinDetailDrawer';
+import { formatCryptoPrice } from '@/lib/utils';
 
 interface TopCoinsTableProps {
     coins: CryptoMarketCoin[];
 }
 
+/**
+ * Top coins table.
+ *
+ * Deliberately four columns. It previously forced six (with a 520px min-width) into a
+ * third-width panel, which produced a horizontal scrollbar and clipped Market Cap and
+ * Volume. Those figures now live in the drawer, which is where you go for detail anyway —
+ * the table stays scannable at any panel width.
+ *
+ * Clicking a row opens the drawer rather than navigating away, so the table stays visible.
+ */
 export default function TopCoinsTable({ coins }: TopCoinsTableProps) {
+    const [selectedId, setSelectedId] = useState<string | null>(null);
+
     if (!coins || coins.length === 0) {
         return (
-            <div className="rounded-xl border border-gray-800 bg-gray-900/30 p-6 text-center text-sm text-gray-500">
+            <div className="flex h-full flex-col items-center justify-center rounded-xl border border-gray-800 bg-gray-900/30 p-6 text-center text-sm text-gray-500">
                 Crypto market data is unavailable right now.
             </div>
         );
     }
 
     return (
-        <div className="flex h-full flex-col overflow-hidden rounded-xl border border-gray-800 bg-gray-900/30">
-            <div className="flex shrink-0 items-center justify-between border-b border-gray-800 px-4 py-2.5">
-                <h2 className="text-sm font-semibold text-white">Top Cryptocurrencies</h2>
-                <span className="text-[11px] text-gray-500">By market cap</span>
+        <>
+            <div className="flex h-full flex-col overflow-hidden rounded-xl border border-gray-800 bg-gray-900/30">
+                <div className="flex shrink-0 items-center justify-between border-b border-gray-800 px-3 py-2">
+                    <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                        Top coins
+                    </h2>
+                    <span className="text-[10px] text-gray-600">by market cap</span>
+                </div>
+
+                {/* Scrolls internally so the dashboard keeps its height. */}
+                <div className="min-h-0 flex-1 overflow-y-auto">
+                    <table className="w-full text-sm">
+                        <thead className="sticky top-0 bg-gray-900/95 backdrop-blur">
+                            <tr className="border-b border-gray-800 text-left text-[10px] uppercase tracking-wider text-gray-500">
+                                <th className="w-8 px-2 py-2 font-medium">#</th>
+                                <th className="px-2 py-2 font-medium">Coin</th>
+                                <th className="px-2 py-2 text-right font-medium">Price</th>
+                                <th className="px-2 py-2 text-right font-medium">24h</th>
+                                <th className="w-5 px-1 py-2" />
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {coins.map((coin) => {
+                                const change = coin.changePercent24h;
+                                const changeClass =
+                                    change === null || change === undefined
+                                        ? 'text-gray-500'
+                                        : change >= 0
+                                            ? 'text-emerald-400'
+                                            : 'text-red-400';
+                                const isSelected = selectedId === coin.id;
+
+                                return (
+                                    <tr
+                                        key={coin.id}
+                                        onClick={() => setSelectedId(coin.id)}
+                                        title="Click for details"
+                                        className={`cursor-pointer border-b border-gray-800/60 transition-colors last:border-0 ${
+                                            isSelected ? 'bg-teal-950/40' : 'hover:bg-white/5'
+                                        }`}
+                                    >
+                                        <td className="px-2 py-1.5 text-[11px] text-gray-600">
+                                            {coin.marketCapRank ?? '-'}
+                                        </td>
+                                        <td className="px-2 py-1.5">
+                                            <div className="flex min-w-0 items-center gap-2">
+                                                {coin.image ? (
+                                                    <Image
+                                                        src={coin.image}
+                                                        alt={coin.name}
+                                                        width={18}
+                                                        height={18}
+                                                        className="h-4 w-4 shrink-0 rounded-full"
+                                                        unoptimized
+                                                    />
+                                                ) : (
+                                                    <div className="h-4 w-4 shrink-0 rounded-full bg-gray-800" />
+                                                )}
+                                                <span className="truncate text-xs font-medium text-gray-100">
+                                                    {coin.name}
+                                                </span>
+                                                <span className="shrink-0 text-[10px] text-gray-500">
+                                                    {coin.symbol}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td className="whitespace-nowrap px-2 py-1.5 text-right font-mono text-[11px] text-gray-100">
+                                            {formatCryptoPrice(coin.currentPrice)}
+                                        </td>
+                                        <td className={`whitespace-nowrap px-2 py-1.5 text-right text-[11px] font-medium ${changeClass}`}>
+                                            {change === null || change === undefined
+                                                ? 'N/A'
+                                                : `${change >= 0 ? '+' : ''}${change.toFixed(1)}%`}
+                                        </td>
+                                        <td className="px-1 py-1.5 text-gray-700">
+                                            <ChevronRight className="h-3 w-3" />
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
-            {/* Scrolls internally so the dashboard does not grow with the coin list. */}
-            <div className="min-h-0 flex-1 overflow-auto">
-                <table className="w-full min-w-[560px] text-sm">
-                    <thead className="sticky top-0 bg-gray-900/95 backdrop-blur">
-                        <tr className="border-b border-gray-800 text-left text-[10px] uppercase tracking-wider text-gray-500">
-                            <th className="px-4 py-2 font-medium">#</th>
-                            <th className="px-4 py-2 font-medium">Coin</th>
-                            <th className="px-4 py-2 text-right font-medium">Price</th>
-                            <th className="px-4 py-2 text-right font-medium">24h</th>
-                            <th className="px-4 py-2 text-right font-medium">Market Cap</th>
-                            <th className="px-4 py-2 text-right font-medium">Volume (24h)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {coins.map((coin) => {
-                            const change = coin.changePercent24h;
-                            const changeClass =
-                                change === null || change === undefined
-                                    ? "text-gray-500"
-                                    : change >= 0
-                                        ? "text-emerald-400"
-                                        : "text-red-400";
-
-                            return (
-                                <tr
-                                    key={coin.id}
-                                    className="border-b border-gray-800/60 transition-colors last:border-0 hover:bg-white/5"
-                                >
-                                    <td className="px-4 py-2 text-xs text-gray-500">
-                                        {coin.marketCapRank ?? "-"}
-                                    </td>
-                                    <td className="px-4 py-2">
-                                        <Link
-                                            href={`/crypto/${coin.id}`}
-                                            className="flex items-center gap-2 group"
-                                        >
-                                            {coin.image ? (
-                                                <Image
-                                                    src={coin.image}
-                                                    alt={coin.name}
-                                                    width={20}
-                                                    height={20}
-                                                    className="h-5 w-5 rounded-full"
-                                                    unoptimized
-                                                />
-                                            ) : (
-                                                <div className="h-5 w-5 rounded-full bg-gray-800" />
-                                            )}
-                                            <span className="font-medium text-gray-100 group-hover:text-teal-400 transition-colors">
-                                                {coin.name}
-                                            </span>
-                                            <span className="text-[11px] text-gray-500">
-                                                {coin.symbol}
-                                            </span>
-                                        </Link>
-                                    </td>
-                                    <td className="px-4 py-2 text-right font-mono text-xs text-gray-100">
-                                        {formatCryptoPrice(coin.currentPrice)}
-                                    </td>
-                                    <td className={`px-4 py-2 text-right text-xs font-medium ${changeClass}`}>
-                                        {change === null || change === undefined
-                                            ? "N/A"
-                                            : `${change >= 0 ? "+" : ""}${change.toFixed(2)}%`}
-                                    </td>
-                                    <td className="px-4 py-2 text-right text-xs text-gray-300">
-                                        {formatMarketCapValue(coin.marketCap)}
-                                    </td>
-                                    <td className="px-4 py-2 text-right text-xs text-gray-400">
-                                        {formatCompactNumber(coin.totalVolume)}
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+            <CoinDetailDrawer coinId={selectedId} onClose={() => setSelectedId(null)} />
+        </>
     );
 }

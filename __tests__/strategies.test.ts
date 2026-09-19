@@ -9,7 +9,7 @@ import {
   type StrategyId,
 } from '@/lib/strategies';
 
-function series(closes: number[], volume = 100): Candle[] {
+function series(closes: number[], volume: number | number[] = 100): Candle[] {
   return closes.map((c, i) => ({
     t: 1_700_000_000 + i * 86_400,
     o: c,

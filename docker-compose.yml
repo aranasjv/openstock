@@ -19,6 +19,13 @@ services:
       FINNHUB_BASE_URL: ${FINNHUB_BASE_URL:-https://finnhub.io/api/v1}
       # Server-only; read at runtime, never bundled into the client.
       COINGECKO_API_KEY: ${COINGECKO_API_KEY:-}
+      # Telegram. All of these are also editable at runtime from /settings, which wins —
+      # these entries just allow first-boot configuration from the environment.
+      TELEGRAM_STOCK_BOT_TOKEN: ${TELEGRAM_STOCK_BOT_TOKEN:-}
+      TELEGRAM_STOCK_CHAT_ID: ${TELEGRAM_STOCK_CHAT_ID:-}
+      TELEGRAM_CRYPTO_BOT_TOKEN: ${TELEGRAM_CRYPTO_BOT_TOKEN:-}
+      TELEGRAM_CRYPTO_CHAT_ID: ${TELEGRAM_CRYPTO_CHAT_ID:-}
+      TELEGRAM_ENABLED: ${TELEGRAM_ENABLED:-true}
       # Gates the /settings page. When unset, the earliest-registered user is the admin.
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
     restart: unless-stopped

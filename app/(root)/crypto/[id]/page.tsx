@@ -58,17 +58,19 @@ export default async function CryptoDetails({ params }: CryptoDetailsPageProps) 
                 <div className="flex flex-col gap-6">
                     {tvSymbol ? (
                         <>
-                            <TradingViewWidget
-                                scriptUrl={`${scriptUrl}symbol-info.js`}
-                                config={SYMBOL_INFO_WIDGET_CONFIG(tvSymbol)}
-                                height={170}
-                            />
-
+                            {/*
+                             * Two charts, each with a distinct job: the candlestick view carries
+                             * RSI and MACD for momentum and overbought/oversold, and the baseline
+                             * view gives a clean price path without candle noise. The baseline
+                             * chart was briefly removed as redundant; it is kept because the two
+                             * read differently, and it sits below the fold rather than competing
+                             * with the main chart.
+                             */}
                             <TradingViewWidget
                                 scriptUrl={`${scriptUrl}advanced-chart.js`}
                                 config={CANDLE_CHART_WIDGET_CONFIG(tvSymbol)}
                                 className="custom-chart"
-                                height={600}
+                                height={520}
                                 allowExpand={true}
                             />
 
@@ -76,8 +78,14 @@ export default async function CryptoDetails({ params }: CryptoDetailsPageProps) 
                                 scriptUrl={`${scriptUrl}advanced-chart.js`}
                                 config={BASELINE_WIDGET_CONFIG(tvSymbol)}
                                 className="custom-chart"
-                                height={600}
+                                height={400}
                                 allowExpand={true}
+                            />
+
+                            <TradingViewWidget
+                                scriptUrl={`${scriptUrl}technical-analysis.js`}
+                                config={TECHNICAL_ANALYSIS_WIDGET_CONFIG(tvSymbol)}
+                                height={380}
                             />
                         </>
                     ) : (
@@ -87,6 +95,16 @@ export default async function CryptoDetails({ params }: CryptoDetailsPageProps) 
 
                 {/* Right column */}
                 <div className="flex flex-col gap-6">
+                    {/* Only render the symbol widget when a real symbol resolved — an empty
+                        symbol would render TradingView's "Invalid Symbol" placeholder. */}
+                    {tvSymbol ? (
+                        <TradingViewWidget
+                            scriptUrl={`${scriptUrl}symbol-info.js`}
+                            config={SYMBOL_INFO_WIDGET_CONFIG(tvSymbol)}
+                            height={170}
+                        />
+                    ) : null}
+
                     <div className="flex items-center justify-between gap-3">
                         <WatchlistButton
                             symbol={coinId}
@@ -112,14 +130,6 @@ export default async function CryptoDetails({ params }: CryptoDetailsPageProps) 
                             Coin details are unavailable right now.
                         </div>
                     )}
-
-                    {tvSymbol ? (
-                        <TradingViewWidget
-                            scriptUrl={`${scriptUrl}technical-analysis.js`}
-                            config={TECHNICAL_ANALYSIS_WIDGET_CONFIG(tvSymbol)}
-                            height={400}
-                        />
-                    ) : null}
                 </div>
             </section>
         </div>

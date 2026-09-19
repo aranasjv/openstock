@@ -22,23 +22,33 @@ interface SettingFieldProps {
     onChange: (key: string, value: string) => void;
 }
 
-const PROVIDER_TEST_TARGETS: Record<string, 'deepseek' | 'gemini' | 'minimax' | 'siray' | 'finnhub' | 'coingecko' | 'telegram'> = {
+const PROVIDER_TEST_TARGETS: Record<
+    string,
+    'deepseek' | 'gemini' | 'minimax' | 'siray' | 'finnhub' | 'coingecko' | 'telegram-stocks' | 'telegram-crypto' | 'telegram-shared'
+> = {
     DEEPSEEK_API_KEY: 'deepseek',
     GEMINI_API_KEY: 'gemini',
     MINIMAX_API_KEY: 'minimax',
     SIRAY_API_KEY: 'siray',
     FINNHUB_API_KEY: 'finnhub',
     COINGECKO_API_KEY: 'coingecko',
-    TELEGRAM_BOT_TOKEN: 'telegram',
+    // Each bot is tested independently — two bots are configured, and one working says
+    // nothing about the other.
+    TELEGRAM_STOCK_BOT_TOKEN: 'telegram-stocks',
+    TELEGRAM_CRYPTO_BOT_TOKEN: 'telegram-crypto',
+    TELEGRAM_BOT_TOKEN: 'telegram-shared',
 };
 
-/** Fields that get the "find my chat id" helper. */
-const TELEGRAM_CHAT_KEYS = new Set(['TELEGRAM_STOCK_CHAT_ID', 'TELEGRAM_CRYPTO_CHAT_ID']);
+/** Fields that get the "find my chat id" helper, mapped to the bot whose chat it belongs to. */
+const TELEGRAM_CHAT_KEYS: Record<string, 'stocks' | 'crypto'> = {
+    TELEGRAM_STOCK_CHAT_ID: 'stocks',
+    TELEGRAM_CRYPTO_CHAT_ID: 'crypto',
+};
 
 export default function SettingField({ field, value, onChange }: SettingFieldProps) {
     const [pending, startTransition] = useTransition();
     const testTarget = PROVIDER_TEST_TARGETS[field.key];
-    const isChatIdField = TELEGRAM_CHAT_KEYS.has(field.key);
+    const chatAudience = TELEGRAM_CHAT_KEYS[field.key];
 
     const handleTest = () => {
         if (!testTarget) return;
@@ -50,8 +60,9 @@ export default function SettingField({ field, value, onChange }: SettingFieldPro
     };
 
     const handleDiscover = () => {
+        if (!chatAudience) return;
         startTransition(async () => {
-            const result = await discoverTelegramChats();
+            const result = await discoverTelegramChats(chatAudience);
             if (!result.ok) {
                 toast.error(result.message);
                 return;
@@ -103,14 +114,14 @@ export default function SettingField({ field, value, onChange }: SettingFieldPro
                             {pending ? 'Testing…' : 'Test'}
                         </Button>
                     ) : null}
-                    {isChatIdField ? (
+                    {chatAudience ? (
                         <Button
                             type="button"
                             variant="ghost"
                             size="sm"
                             disabled={pending}
                             onClick={handleDiscover}
-                            title="Message your bot in Telegram first, then click to read the chat id back."
+                            title={`Message the ${chatAudience} bot in Telegram first, then click to read the chat id back.`}
                             className="h-7 px-2 text-xs text-gray-400 hover:text-white hover:bg-white/10"
                         >
                             Find chat id

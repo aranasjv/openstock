@@ -3,7 +3,6 @@ import Sidebar from "@/components/layout/Sidebar";
 import { getAuth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import Footer from "@/components/Footer";
 import DonatePopup from "@/components/DonatePopup";
 
 // Session-dependent: never prerender at build time (keeps builds database-free).
@@ -22,20 +21,19 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
     }
 
     return (
-        // Sidebar on desktop, slim header (with the nav in the user dropdown) on mobile.
-        <div className="flex min-h-screen text-gray-400">
+        // The shell is viewport-height so dashboards can fill it exactly and scroll only
+        // inside their own panels. Main scrolls normally for longer pages like settings.
+        <div className="flex h-screen overflow-hidden text-gray-400">
             <Sidebar user={user} />
 
             <div className="flex min-w-0 flex-1 flex-col">
-                <div className="lg:hidden">
+                <div className="shrink-0 lg:hidden">
                     <Header user={user} />
                 </div>
 
-                <main className="min-w-0 flex-1">
+                <main className="min-h-0 flex-1 overflow-y-auto">
                     {children}
                 </main>
-
-                <Footer />
             </div>
 
             <DonatePopup />
