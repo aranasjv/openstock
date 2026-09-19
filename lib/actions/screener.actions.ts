@@ -12,6 +12,7 @@ import {
     type StrategyId,
 } from '@/lib/strategies';
 import { getCryptoMarkets, getCryptoPriceHistory } from '@/lib/actions/crypto.actions';
+import { buildCandidatePrompt, getTraderFramework } from '@/lib/trading-framework';
 import type { AIProviderName } from '@/lib/ai-provider';
 
 /**
@@ -256,12 +257,16 @@ export async function getStrategiesForUi(): Promise<
 /**
  * AI rationale for one candidate, generated on demand rather than for every row on every
  * page load — each call costs credit.
+ *
+ * The model only writes the explanation. Selection, scoring and ordering stay
+ * deterministic in lib/strategies.ts, so switching AI provider or framework never changes
+ * which assets appear or how they rank.
  */
 export async function explainCandidate(
     assetType: 'stock' | 'crypto',
     symbol: string,
     strategyIdInput: string
-): Promise<{ ok: boolean; text?: string; error?: string }> {
+): Promise<{ ok: boolean; text?: string; error?: string; framework?: string; provider?: string }> {
     const strategyId: StrategyId = isStrategyId(strategyIdInput) ? strategyIdInput : DEFAULT_STRATEGY_ID;
 
     try {
@@ -278,28 +283,31 @@ export async function explainCandidate(
         const result = runStrategy(bundle, strategyId);
         const strategy = STRATEGIES.find((s) => s.id === strategyId) ?? STRATEGIES[0];
 
-        const prompt = [
-            `You are explaining a rule-based technical screen to a retail investor. Be concise (max 90 words).`,
-            `Do not give investment advice, price targets, or a buy/sell recommendation.`,
-            `Explain what the conditions below mean for this asset and note the main risk of this setup.`,
-            ``,
-            `Asset: ${symbol} (${assetType})`,
-            `Strategy: ${strategy.name} — ${strategy.summary}`,
-            `Measured conditions met: ${result.matched} of ${result.total}`,
-            ...result.passed.map((c) => `  MET: ${c.label} (${c.detail})`),
-            ...result.failed.map((c) => `  NOT MET: ${c.label} (${c.detail})`),
-            `Other context: 30-day change ${bundle.change30d?.toFixed(1) ?? 'n/a'}%, max drawdown ${bundle.maxDrawdown?.toFixed(1) ?? 'n/a'}%, annualised-ish volatility ${bundle.volatility?.toFixed(1) ?? 'n/a'}%.`,
-            ``,
-            `Start with a single sentence summarising the setup, then one sentence on the main risk.`,
-        ].join('\n');
-
         const config = await loadConfig();
         const providerName = (config.AI_PROVIDER || 'gemini') as AIProviderName;
 
-        const { callAIProvider } = await import('@/lib/ai-provider');
-        const text = await callAIProvider(prompt, providerName);
+        // The framework comes from the same runtime config as everything else.
+        const framework = getTraderFramework(config.TRADER_FRAMEWORK);
 
-        return { ok: true, text: text.trim() };
+        const prompt = buildCandidatePrompt({
+            symbol,
+            assetType,
+            strategyName: strategy.name,
+            strategySummary: strategy.summary,
+            bundle,
+            passed: result.passed,
+            failed: result.failed,
+            matched: result.matched,
+            total: result.total,
+        });
+
+        const { callAIProvider } = await import('@/lib/ai-provider');
+        const text = await callAIProvider(prompt, providerName, {
+            system: framework.system,
+            temperature: framework.temperature,
+        });
+
+        return { ok: true, text: text.trim(), framework: framework.name, provider: providerName };
     } catch (error) {
         console.error('explainCandidate failed:', error);
         return {

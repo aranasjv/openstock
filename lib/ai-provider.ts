@@ -29,6 +29,12 @@ export interface AIProviderConfig {
     model: string;
 }
 
+export interface AIRequestOptions {
+    /** Instructions that shape how the model responds (persona, rules, format). */
+    system?: string;
+    temperature?: number;
+}
+
 /**
  * Resolve the provider configuration from the runtime config layer.
  */
@@ -103,17 +109,31 @@ export async function getFallbackProviderName(primary: AIProviderName): Promise<
 
 // ── Provider call implementations ──────────────────────────────────
 
-async function callGemini(prompt: string, config: AIProviderConfig): Promise<string> {
+async function callGemini(
+    prompt: string,
+    config: AIProviderConfig,
+    options?: AIRequestOptions
+): Promise<string> {
     if (!config.apiKey) throw new Error('GEMINI_API_KEY is not set');
 
     const url = `${config.baseUrl}/${config.model}:generateContent?key=${config.apiKey}`;
 
+    const body: Record<string, unknown> = {
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    };
+
+    if (options?.system) {
+        body.systemInstruction = { parts: [{ text: options.system }] };
+    }
+
+    if (typeof options?.temperature === 'number') {
+        body.generationConfig = { temperature: options.temperature };
+    }
+
     const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        }),
+        body: JSON.stringify(body),
     });
 
     if (!res.ok) {
@@ -130,12 +150,22 @@ async function callGemini(prompt: string, config: AIProviderConfig): Promise<str
  * DeepSeek, MiniMax and Siray all speak the OpenAI chat-completions dialect, so they
  * share this implementation.
  */
-async function callOpenAICompatible(prompt: string, config: AIProviderConfig): Promise<string> {
+async function callOpenAICompatible(
+    prompt: string,
+    config: AIProviderConfig,
+    options?: AIRequestOptions
+): Promise<string> {
     if (!config.apiKey) {
         throw new Error(`${config.name.toUpperCase()}_API_KEY is not set`);
     }
 
     const url = `${config.baseUrl}/chat/completions`;
+
+    const messages: { role: 'system' | 'user'; content: string }[] = [];
+    if (options?.system) {
+        messages.push({ role: 'system', content: options.system });
+    }
+    messages.push({ role: 'user', content: prompt });
 
     const res = await fetch(url, {
         method: 'POST',
@@ -145,8 +175,8 @@ async function callOpenAICompatible(prompt: string, config: AIProviderConfig): P
         },
         body: JSON.stringify({
             model: config.model,
-            messages: [{ role: 'user', content: prompt }],
-            temperature: 0.7,
+            messages,
+            temperature: options?.temperature ?? 0.7,
         }),
     });
 
@@ -168,29 +198,36 @@ async function callOpenAICompatible(prompt: string, config: AIProviderConfig): P
  * Call the configured (or specified) AI provider and return the model response as a
  * plain string.
  */
-export async function callAIProvider(prompt: string, provider?: AIProviderName): Promise<string> {
+export async function callAIProvider(
+    prompt: string,
+    provider?: AIProviderName,
+    options?: AIRequestOptions
+): Promise<string> {
     const config = await getProviderConfig(provider);
 
     if (config.name === 'gemini') {
-        return callGemini(prompt, config);
+        return callGemini(prompt, config, options);
     }
     // DeepSeek, MiniMax and Siray all use OpenAI-compatible endpoints
-    return callOpenAICompatible(prompt, config);
+    return callOpenAICompatible(prompt, config, options);
 }
 
 /**
  * Call the AI provider with automatic fallback.
  * Tries the primary provider first; on failure switches to the fallback.
  */
-export async function callAIProviderWithFallback(prompt: string): Promise<string> {
+export async function callAIProviderWithFallback(
+    prompt: string,
+    options?: AIRequestOptions
+): Promise<string> {
     const config = await loadConfig();
     const primaryName = ((config.AI_PROVIDER as AIProviderName) || 'gemini') as AIProviderName;
     const fallbackName = await getFallbackProviderName(primaryName);
 
     try {
-        return await callAIProvider(prompt, primaryName);
+        return await callAIProvider(prompt, primaryName, options);
     } catch (primaryError) {
         console.error(`⚠️ ${primaryName} failed, switching to ${fallbackName} fallback`, primaryError);
-        return await callAIProvider(prompt, fallbackName);
+        return await callAIProvider(prompt, fallbackName, options);
     }
 }

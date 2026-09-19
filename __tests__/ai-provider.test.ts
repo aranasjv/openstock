@@ -343,6 +343,68 @@ describe("callAIProvider", () => {
       "minimax returned empty response"
     );
   });
+
+  it("prepends a system message for OpenAI-compatible providers when given one", async () => {
+    process.env.DEEPSEEK_API_KEY = "k";
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ choices: [{ message: { content: "ok" } }] }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    await callAIProvider("analyse this", "deepseek", {
+      system: "You are a technical analyst.",
+      temperature: 0.3,
+    });
+
+    const [, options] = mockFetch.mock.calls[0];
+    const body = JSON.parse(options.body);
+    expect(body.messages).toHaveLength(2);
+    expect(body.messages[0]).toEqual({
+      role: "system",
+      content: "You are a technical analyst.",
+    });
+    expect(body.messages[1]).toEqual({ role: "user", content: "analyse this" });
+    expect(body.temperature).toBe(0.3);
+  });
+
+  it("omits the system message when none is supplied", async () => {
+    process.env.DEEPSEEK_API_KEY = "k";
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ choices: [{ message: { content: "ok" } }] }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    await callAIProvider("analyse this", "deepseek");
+
+    const [, options] = mockFetch.mock.calls[0];
+    const body = JSON.parse(options.body);
+    expect(body.messages).toHaveLength(1);
+    expect(body.messages[0].role).toBe("user");
+    expect(body.temperature).toBe(0.7);
+  });
+
+  it("passes a systemInstruction to Gemini", async () => {
+    process.env.GEMINI_API_KEY = "k";
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({ candidates: [{ content: { parts: [{ text: "ok" }] } }] }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    await callAIProvider("analyse this", "gemini", { system: "Be objective.", temperature: 0.2 });
+
+    const [, options] = mockFetch.mock.calls[0];
+    const body = JSON.parse(options.body);
+    expect(body.systemInstruction).toEqual({ parts: [{ text: "Be objective." }] });
+    expect(body.generationConfig).toEqual({ temperature: 0.2 });
+    expect(body.contents[0].parts[0].text).toBe("analyse this");
+  });
 });
 
 // ── callAIProviderWithFallback ─────────────────────────────────────

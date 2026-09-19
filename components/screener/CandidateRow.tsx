@@ -24,6 +24,7 @@ export default function CandidateRow({ rank, candidate, assetType, strategyId }:
     const [expanded, setExpanded] = useState(false);
     const [pending, startTransition] = useTransition();
     const [explanation, setExplanation] = useState<string | null>(null);
+    const [explainMeta, setExplainMeta] = useState<{ framework?: string; provider?: string } | null>(null);
     const [explainError, setExplainError] = useState<string | null>(null);
 
     const price = assetType === 'crypto' ? formatCryptoPrice(candidate.price) : formatPrice(candidate.price);
@@ -33,8 +34,12 @@ export default function CandidateRow({ rank, candidate, assetType, strategyId }:
         startTransition(async () => {
             setExplainError(null);
             const result = await explainCandidate(assetType, candidate.symbol, strategyId);
-            if (result.ok && result.text) setExplanation(result.text);
-            else setExplainError(result.error ?? 'Could not generate an explanation.');
+            if (result.ok && result.text) {
+                setExplanation(result.text);
+                setExplainMeta({ framework: result.framework, provider: result.provider });
+            } else {
+                setExplainError(result.error ?? 'Could not generate an explanation.');
+            }
         });
     };
 
@@ -119,9 +124,18 @@ export default function CandidateRow({ rank, candidate, assetType, strategyId }:
                     </div>
 
                     {explanation ? (
-                        <p className="rounded-md border border-gray-800 bg-gray-900/40 p-3 text-xs leading-relaxed text-gray-400">
-                            {explanation}
-                        </p>
+                        <div className="rounded-md border border-gray-800 bg-gray-900/40 p-3">
+                            <p className="whitespace-pre-line text-xs leading-relaxed text-gray-300">
+                                {explanation}
+                            </p>
+                            {explainMeta?.framework ? (
+                                <p className="mt-2 border-t border-gray-800 pt-2 text-[10px] text-gray-600">
+                                    {explainMeta.framework}
+                                    {explainMeta.provider ? ` · ${explainMeta.provider}` : ''} · AI-written
+                                    commentary on the figures above, not advice
+                                </p>
+                            ) : null}
+                        </div>
                     ) : null}
                     {explainError ? (
                         <p className="text-xs text-red-400">{explainError}</p>

@@ -65,6 +65,18 @@ export const CONFIG_SCHEMA: SettingDef[] = [
     { key: 'SIRAY_BASE_URL', group: 'ai', env: ['SIRAY_BASE_URL'], label: 'Siray base URL', default: 'https://api.siray.ai/v1' },
     { key: 'SIRAY_MODEL', group: 'ai', env: ['SIRAY_MODEL'], label: 'Siray model', default: 'siray-1.0-ultra' },
 
+    {
+        key: 'TRADER_FRAMEWORK',
+        group: 'ai',
+        env: ['TRADER_FRAMEWORK'],
+        label: 'Trader analysis framework',
+        description:
+            'How the AI writes its explanation of a screener result. "Technical Analyst" applies a structured methodology adapted from tradermonty/claude-trading-skills (MIT): trend, levels, momentum and volume, a mandatory opposing case, and an invalidation level. It shapes wording only — ranking stays deterministic.',
+        default: 'technical-analyst',
+        type: 'select',
+        options: ['technical-analyst', 'plain'],
+    },
+
     // ── Market data ─────────────────────────────────────────────────
     {
         key: 'FINNHUB_API_KEY',
