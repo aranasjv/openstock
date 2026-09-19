@@ -38,8 +38,10 @@ export default async function CryptoDashboard({ searchParams }: CryptoDashboardP
     ]);
 
     return (
-        <div className="flex h-full flex-col gap-3 p-3">
-            <header className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        // No outer padding: panels sit flush against the sidebar and viewport edges. A small
+        // gap still separates panels from each other.
+        <div className="flex h-full flex-col gap-2">
+            <header className="flex shrink-0 flex-col gap-2 px-2 pt-2 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-baseline gap-2">
                     <h1 className="bg-clip-text text-lg font-bold text-transparent bg-gradient-to-r from-white to-gray-500">
                         Crypto
@@ -63,7 +65,7 @@ export default async function CryptoDashboard({ searchParams }: CryptoDashboardP
                 </div>
             </header>
 
-            <section className="grid shrink-0 gap-3 xl:grid-cols-3">
+            <section className="grid shrink-0 gap-2 xl:grid-cols-3">
                 <TradingViewWidget
                     title="Market overview"
                     scriptUrl={`${scriptUrl}market-overview.js`}
@@ -87,7 +89,7 @@ export default async function CryptoDashboard({ searchParams }: CryptoDashboardP
 
             {/* One flexible row: every panel takes the remaining height, so all three line up
                 and none of them can push the page taller than the viewport. */}
-            <section className="grid min-h-0 flex-1 gap-3 xl:grid-cols-3">
+            <section className="grid min-h-0 flex-1 gap-2 xl:grid-cols-3">
                 <div className="h-full min-h-0">
                     <TopCoinsTable coins={markets} />
                 </div>

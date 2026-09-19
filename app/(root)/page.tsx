@@ -26,8 +26,10 @@ const Home = async ({ searchParams }: HomeProps) => {
     const scriptUrl = `https://s3.tradingview.com/external-embedding/embed-widget-`;
 
     return (
-        <div className="flex h-full flex-col gap-3 p-3">
-            <section className="grid shrink-0 gap-3 xl:grid-cols-3">
+        // No outer padding: the panels sit flush against the sidebar and viewport edges so the
+        // dashboard uses the full area. A small gap still separates panels from each other.
+        <div className="flex h-full flex-col gap-2">
+            <section className="grid shrink-0 gap-2 xl:grid-cols-3">
                 <TradingViewWidget
                     title="Market Overview"
                     scriptUrl={`${scriptUrl}market-overview.js`}
@@ -49,7 +51,7 @@ const Home = async ({ searchParams }: HomeProps) => {
                 />
             </section>
 
-            <section className="grid min-h-0 flex-1 gap-3 xl:grid-cols-3">
+            <section className="grid min-h-0 flex-1 gap-2 xl:grid-cols-3">
                 <div className="h-full min-h-0 xl:col-span-2">
                     <MustBuySection assetType="stock" strategyId={strategy} />
                 </div>

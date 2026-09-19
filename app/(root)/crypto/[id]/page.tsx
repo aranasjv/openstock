@@ -12,8 +12,9 @@ import {
 import { getAuth } from '@/lib/better-auth/auth';
 import { headers } from 'next/headers';
 import { isStockInWatchlist } from '@/lib/actions/watchlist.actions';
-import { getCryptoCoinDetail } from '@/lib/actions/crypto.actions';
+import { getCryptoCoinDetail, getCryptoMarketSentiment } from '@/lib/actions/crypto.actions';
 import { resolveCryptoTradingViewSymbol } from '@/lib/tradingview';
+import CryptoSentimentCard from '@/components/crypto/CryptoSentimentCard';
 
 function ChartUnavailable({ label }: { label: string }) {
     return (
@@ -38,9 +39,10 @@ export default async function CryptoDetails({ params }: CryptoDetailsPageProps) 
     });
     const userId = session?.user?.id;
 
-    const [isInWatchlist, coin] = await Promise.all([
+    const [isInWatchlist, coin, marketSentiment] = await Promise.all([
         userId ? isStockInWatchlist(userId, coinId, 'crypto') : Promise.resolve(false),
         getCryptoCoinDetail(coinId),
+        getCryptoMarketSentiment(),
     ]);
 
     // TradingView needs the ticker ("TAO"), not the CoinGecko id ("bittensor"), and it needs
@@ -130,6 +132,12 @@ export default async function CryptoDetails({ params }: CryptoDetailsPageProps) 
                             Coin details are unavailable right now.
                         </div>
                     )}
+
+                    <CryptoSentimentCard
+                        up={coin?.sentimentUp}
+                        down={coin?.sentimentDown}
+                        market={marketSentiment}
+                    />
                 </div>
             </section>
         </div>

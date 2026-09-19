@@ -250,6 +250,9 @@ declare global {
         homepage?: string;
         subreddit?: string;
         lastUpdated?: string;
+        /** Community sentiment percentages from CoinGecko, 0-100, or null when unavailable. */
+        sentimentUp?: number | null;
+        sentimentDown?: number | null;
     };
 
     type CryptoQuote = {

@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { X, ExternalLink, Loader2 } from 'lucide-react';
-import { getCryptoCoinDetail } from '@/lib/actions/crypto.actions';
+import { getCryptoCoinDetail, getCryptoMarketSentiment } from '@/lib/actions/crypto.actions';
 import { resolveCryptoSymbols } from '@/lib/actions/tradingview.actions';
 import TradingViewWidget from '@/components/TradingViewWidget';
+import CryptoSentimentCard from '@/components/crypto/CryptoSentimentCard';
 import { CANDLE_CHART_WIDGET_CONFIG } from '@/lib/constants';
 import {
     formatCompactNumber,
@@ -29,6 +30,7 @@ interface CoinDetailDrawerProps {
 export default function CoinDetailDrawer({ coinId, onClose }: CoinDetailDrawerProps) {
     const [coin, setCoin] = useState<CryptoCoinDetail | null>(null);
     const [symbol, setSymbol] = useState<string | null>(null);
+    const [market, setMarket] = useState<{ value: number; classification: string; updatedAt: number } | null>(null);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -42,6 +44,15 @@ export default function CoinDetailDrawer({ coinId, onClose }: CoinDetailDrawerPr
         setLoading(true);
         setCoin(null);
         setSymbol(null);
+
+        // Market sentiment is market-wide, so it only needs fetching once per open.
+        getCryptoMarketSentiment()
+            .then((result) => {
+                if (!cancelled) setMarket(result);
+            })
+            .catch(() => {
+                /* context only — the card hides itself when absent */
+            });
 
         getCryptoCoinDetail(coinId)
             .then(async (detail) => {
@@ -180,6 +191,12 @@ export default function CoinDetailDrawer({ coinId, onClose }: CoinDetailDrawerPr
                                     </p>
                                 </div>
                             ) : null}
+
+                            <CryptoSentimentCard
+                                up={coin.sentimentUp}
+                                down={coin.sentimentDown}
+                                market={market}
+                            />
                         </div>
                     ) : (
                         <p className="p-4 text-xs text-gray-500">

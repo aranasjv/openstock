@@ -141,6 +141,9 @@ export async function getCryptoCoinDetail(coinId: string): Promise<CryptoCoinDet
         description?: { en?: string };
         links?: { homepage?: string[]; blockchain_site?: string[]; subreddit_url?: string };
         market_cap_rank?: number | null;
+        /** Community sentiment, returned by the same request — no extra call needed. */
+        sentiment_votes_up_percentage?: number | null;
+        sentiment_votes_down_percentage?: number | null;
         market_data?: {
             current_price?: { usd?: number };
             market_cap?: { usd?: number };
@@ -181,7 +184,56 @@ export async function getCryptoCoinDetail(coinId: string): Promise<CryptoCoinDet
         homepage,
         subreddit: raw.links?.subreddit_url || undefined,
         lastUpdated: raw.last_updated,
+        sentimentUp: raw.sentiment_votes_up_percentage ?? null,
+        sentimentDown: raw.sentiment_votes_down_percentage ?? null,
     };
+}
+
+/**
+ * Market-wide crypto sentiment: the Fear & Greed Index from alternative.me (free, no key).
+ *
+ * This is context for a single coin rather than a per-coin signal — it answers "what is the
+ * overall market mood", which a coin's own votes cannot.
+ */
+export async function getCryptoMarketSentiment(): Promise<{
+    value: number;
+    classification: string;
+    updatedAt: number;
+} | null> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    try {
+        const res = await fetch('https://api.alternative.me/fng/?limit=1', {
+            cache: 'force-cache',
+            next: { revalidate: 1800 },
+            signal: controller.signal,
+        });
+
+        if (!res.ok) {
+            console.error(`Fear & Greed ${res.status}`);
+            return null;
+        }
+
+        const json = (await res.json()) as {
+            data?: { value?: string; value_classification?: string; timestamp?: string }[];
+        };
+        const entry = json?.data?.[0];
+        const value = Number.parseInt(entry?.value ?? '', 10);
+
+        if (!Number.isFinite(value)) return null;
+
+        return {
+            value,
+            classification: entry?.value_classification ?? 'Unknown',
+            updatedAt: Number.parseInt(entry?.timestamp ?? '0', 10) * 1000,
+        };
+    } catch (error) {
+        console.error('Fear & Greed request failed:', error);
+        return null;
+    } finally {
+        clearTimeout(timeout);
+    }
 }
 
 /**
