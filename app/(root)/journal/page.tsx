@@ -1,14 +1,23 @@
+import { headers } from 'next/headers';
+import BreakerBanner from '@/components/journal/BreakerBanner';
 import JournalBoard from '@/components/journal/JournalBoard';
-import { listTheses } from '@/lib/actions/thesis.actions';
+import { getAuth } from '@/lib/better-auth/auth';
+import { evaluateBreakerForUser, listThesesForUser } from '@/lib/data/theses';
 
 /**
  * The trade journal.
  *
- * Reads through the session-resolving action, so the list is always the caller's own: the data
- * layer takes an explicit `userId` and the action is the only thing that supplies one.
+ * Resolves the session here and hands an explicit `userId` to the data layer rather than going
+ * through a session-resolving action. Both reads are server-only, so an action would expose them to
+ * the browser for nothing — the mutations the board needs still go through actions, because those
+ * genuinely are invoked from the client.
  */
 export default async function JournalPage() {
-    const theses = await listTheses();
+    const auth = await getAuth();
+    const session = await auth.api.getSession({ headers: await headers() });
+    const userId = session?.user?.id ?? '';
+
+    const [theses, breaker] = await Promise.all([listThesesForUser(userId), evaluateBreakerForUser(userId)]);
 
     return (
         <div className="flex h-full flex-col gap-3 p-3">
@@ -20,6 +29,8 @@ export default async function JournalPage() {
                     Theses written before the trade, and what actually happened. Status moves are forward-only.
                 </p>
             </header>
+
+            <BreakerBanner decision={breaker} />
 
             <JournalBoard theses={theses} />
         </div>

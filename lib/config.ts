@@ -19,7 +19,7 @@ import { AppSettingsModel, SETTINGS_DOC_KEY } from '@/database/models/settings.m
  * which is what keeps API keys off the browser.
  */
 
-export type SettingGroup = 'ai' | 'market' | 'sentiment' | 'notifications' | 'email' | 'automation' | 'screener' | 'system';
+export type SettingGroup = 'ai' | 'market' | 'sentiment' | 'notifications' | 'email' | 'automation' | 'screener' | 'risk' | 'system';
 
 export interface SettingDef {
     /** Canonical key used in code. */
@@ -387,12 +387,59 @@ export const CONFIG_SCHEMA: SettingDef[] = [
         runtimeEditable: false,
     },
     {
-        key: 'ADMIN_EMAILS',
-        group: 'system',
-        env: ['ADMIN_EMAILS'],
-        label: 'Admin emails',
-        description: 'Comma-separated. Read-only here; if unset, the earliest registered user is the admin.',
-        runtimeEditable: false,
+        key: 'ACCOUNT_SIZE',
+        group: 'risk',
+        env: ['ACCOUNT_SIZE'],
+        label: 'Account size (USD)',
+        description:
+            'The figure the circuit breaker and the position sizer measure against. Both are expressed in percentages of the account, so neither can answer without it.',
+        default: '100000',
+        type: 'number',
+    },
+    {
+        key: 'BREAKER_MAX_DAILY_LOSS_PCT',
+        group: 'risk',
+        env: ['BREAKER_MAX_DAILY_LOSS_PCT'],
+        label: 'Breaker: max daily loss (%)',
+        description: 'Realized loss in one ET day that halts new entries until the next ET weekday.',
+        default: '2',
+        type: 'number',
+    },
+    {
+        key: 'BREAKER_LOSING_STREAK_N',
+        group: 'risk',
+        env: ['BREAKER_LOSING_STREAK_N'],
+        label: 'Breaker: losing streak',
+        description: 'Consecutive losing closes before a cooldown. A win resets the count.',
+        default: '2',
+        type: 'number',
+    },
+    {
+        key: 'BREAKER_COOLDOWN_HOURS',
+        group: 'risk',
+        env: ['BREAKER_COOLDOWN_HOURS'],
+        label: 'Breaker: cooldown (hours)',
+        description: 'How long a losing-streak cooldown lasts, measured from the latest loss exit.',
+        default: '24',
+        type: 'number',
+    },
+    {
+        key: 'BREAKER_WEEKLY_DRAWDOWN_PCT',
+        group: 'risk',
+        env: ['BREAKER_WEEKLY_DRAWDOWN_PCT'],
+        label: 'Breaker: weekly drawdown (%)',
+        description: 'Realized loss in one ET week that halts new entries until the next Monday.',
+        default: '5',
+        type: 'number',
+    },
+    {
+        key: 'BREAKER_MONTHLY_DRAWDOWN_PCT',
+        group: 'risk',
+        env: ['BREAKER_MONTHLY_DRAWDOWN_PCT'],
+        label: 'Breaker: monthly drawdown (%)',
+        description: 'Realized loss in one ET month that halts new entries until the first of the next.',
+        default: '8',
+        type: 'number',
     },
 ];
 
@@ -406,6 +453,7 @@ export const SETTING_GROUPS: { id: SettingGroup; label: string }[] = [
     { id: 'email', label: 'Email' },
     { id: 'automation', label: 'Automation' },
     { id: 'screener', label: 'Screener' },
+    { id: 'risk', label: 'Risk' },
     { id: 'system', label: 'System (read-only)' },
 ];
 

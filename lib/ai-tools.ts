@@ -619,6 +619,30 @@ export const AI_TOOLS: AITool[] = [
             };
         },
     },
+    {
+        spec: {
+            name: 'get_circuit_breaker',
+            description:
+                'The account-level circuit breaker: whether new entries are allowed right now, and if not, which realized-loss rule stopped them and when it lifts. Computed from closed journal theses, never from open positions. Check this before proposing a position.',
+            parameters: { type: 'object', properties: {} },
+        },
+        execute: async (_args, ctx) => {
+            const { evaluateBreakerForUser } = await import('@/lib/data/theses');
+            const decision = await evaluateBreakerForUser(ctx.userId);
+
+            return {
+                recommendation: decision.recommendation,
+                dataQuality: decision.dataQuality,
+                rationale: decision.rationale,
+                metrics: decision.metrics,
+                triggeredRules: decision.triggeredRules,
+                note:
+                    decision.recommendation === 'TRADING_ALLOWED'
+                        ? "New entries are permitted. Report that as the account's current state; it is not a recommendation to buy."
+                        : "New entries are blocked by the account's own risk rules. State which rule triggered and when it lifts rather than proposing a position.",
+            };
+        },
+    },
 ];
 
 const TOOL_BY_NAME = new Map(AI_TOOLS.map((tool) => [tool.spec.name, tool]));

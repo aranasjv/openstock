@@ -2,6 +2,10 @@ import 'server-only';
 
 import type { FlattenMaps } from 'mongoose';
 import { connectToDatabase } from '@/database/mongoose';
+import type { RealisedEvent } from '@/lib/circuit-breaker';
+import { evaluateCircuitBreaker, DEFAULT_BREAKER_CONFIG, type BreakerDecision } from '@/lib/circuit-breaker';
+import { getConfigNumber } from '@/lib/config';
+import { MAX_LIST_ITEMS } from '@/lib/validate';
 import { ThesisModel, type Thesis, type ThesisType } from '@/database/models/thesis.model';
 import {
     applyTrim,
@@ -390,4 +394,87 @@ function finaliseOutcome(
             Math.floor((exitAt.getTime() - new Date(opened).getTime()) / 86_400_000)
         );
     }
+}
+
+/**
+ * The realized ledger for the circuit breaker, plus whatever makes it untrustworthy.
+ *
+ * Only **sales** produce realized P&L, so only those ledger entries become events — a status change
+ * is not a result, and counting one would let a thesis look like a loss before it was closed.
+ *
+ * Two kinds of gap are separated, because the playbook treats them differently:
+ * - a sale whose figure cannot be read is **fatal** — the breaker fails closed rather than summing a
+ *   loss it could not verify;
+ * - a thesis settled with a finite recorded total but no ledger is **recoverable** — reported, and
+ *   deliberately non-blocking, because the number is sound even if its provenance is not.
+ */
+export async function breakerInputForUser(
+    userId: string
+): Promise<{ events: RealisedEvent[]; incomplete: string[]; recoverable: string[] }> {
+    await connectToDatabase();
+
+    const theses = await ThesisModel.find({ userId }).limit(MAX_LIST_ITEMS).lean();
+    const events: RealisedEvent[] = [];
+    const incomplete: string[] = [];
+    const recoverable: string[] = [];
+
+    for (const thesis of theses) {
+        const history = thesis.statusHistory ?? [];
+        let sales = 0;
+
+        for (const entry of history) {
+            if (typeof entry.sharesSold !== 'number' || entry.sharesSold <= 0) continue;
+            sales += 1;
+
+            if (typeof entry.realizedPnl !== 'number' || !Number.isFinite(entry.realizedPnl)) {
+                incomplete.push(`${thesis.ticker} has a sale with no usable realized P&L`);
+                continue;
+            }
+
+            events.push({ at: String(entry.at), pnl: entry.realizedPnl });
+        }
+
+        if (sales > 0) continue;
+        if (thesis.status !== 'CLOSED' && thesis.status !== 'PARTIALLY_CLOSED') continue;
+
+        const fallback = thesis.outcome?.pnlDollars;
+        if (typeof fallback === 'number' && Number.isFinite(fallback)) {
+            events.push({ at: new Date(String(thesis.updatedAt ?? Date.now())).toISOString(), pnl: fallback });
+            recoverable.push(`${thesis.ticker} was settled without a realized ledger; its recorded total was used`);
+        } else {
+            incomplete.push(`${thesis.ticker} is ${thesis.status} with no realized P&L on record`);
+        }
+    }
+
+    return { events, incomplete, recoverable };
+}
+
+/**
+ * The circuit breaker decision for one account.
+ *
+ * Deliberately **not** a `'use server'` export: its only caller is a server component, so exposing
+ * it as an action would let a browser invoke it for no benefit. Thresholds come from config so they
+ * are tunable at runtime, and the account size is required rather than defaulted in code — every rule
+ * here is a percentage of it, so a wrong figure silently changes every limit.
+ */
+export async function evaluateBreakerForUser(userId: string, asOf = new Date()): Promise<BreakerDecision> {
+    const [input, accountSize, maxDailyLossPct, losingStreakN, cooldownHours, weeklyDrawdownPct, monthlyDrawdownPct] =
+        await Promise.all([
+            breakerInputForUser(userId),
+            getConfigNumber('ACCOUNT_SIZE', 0),
+            getConfigNumber('BREAKER_MAX_DAILY_LOSS_PCT', DEFAULT_BREAKER_CONFIG.maxDailyLossPct),
+            getConfigNumber('BREAKER_LOSING_STREAK_N', DEFAULT_BREAKER_CONFIG.losingStreakN),
+            getConfigNumber('BREAKER_COOLDOWN_HOURS', DEFAULT_BREAKER_CONFIG.cooldownHours),
+            getConfigNumber('BREAKER_WEEKLY_DRAWDOWN_PCT', DEFAULT_BREAKER_CONFIG.weeklyDrawdownPct),
+            getConfigNumber('BREAKER_MONTHLY_DRAWDOWN_PCT', DEFAULT_BREAKER_CONFIG.monthlyDrawdownPct),
+        ]);
+
+    return evaluateCircuitBreaker({
+        events: input.events,
+        accountSize,
+        asOf,
+        incomplete: input.incomplete,
+        recoverable: input.recoverable,
+        config: { maxDailyLossPct, losingStreakN, cooldownHours, weeklyDrawdownPct, monthlyDrawdownPct },
+    });
 }

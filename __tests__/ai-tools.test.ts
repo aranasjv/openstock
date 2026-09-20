@@ -71,7 +71,9 @@ vi.mock('@/lib/analysis-skills', () => ({
 }));
 
 const getCryptoRegime = vi.fn();
+const evaluateBreakerForUser = vi.fn();
 vi.mock('@/lib/crypto-regime-live', () => ({ getCryptoRegime: () => getCryptoRegime() }));
+vi.mock('@/lib/data/theses', () => ({ evaluateBreakerForUser: (userId: string) => evaluateBreakerForUser(userId) }));
 
 import { AI_TOOLS, getTool, getToolSpecs } from '@/lib/ai-tools';
 
@@ -83,9 +85,9 @@ beforeEach(() => {
 });
 
 describe('tool registry shape', () => {
-    it('exposes thirteen tools', () => {
-        expect(getToolSpecs()).toHaveLength(13);
-        expect(AI_TOOLS).toHaveLength(13);
+    it('exposes fourteen tools', () => {
+        expect(getToolSpecs()).toHaveLength(14);
+        expect(AI_TOOLS).toHaveLength(14);
     });
 
     it('gives every tool a unique, non-empty name and description', () => {
@@ -572,5 +574,52 @@ describe('get_crypto_regime', () => {
         expect(result.score).toBeUndefined();
         expect(result.zone).toBe('UNKNOWN');
         expect(result.note).toMatch(/do not estimate a regime/i);
+    });
+});
+
+describe('get_circuit_breaker', () => {
+    it('acts for the signed-in user and reports the blocking rule, not a bare verdict', async () => {
+        evaluateBreakerForUser.mockResolvedValue({
+            recommendation: 'HALTED',
+            dataQuality: 'OK',
+            rationale: 'realized -2.5% today against a 2.0% limit',
+            metrics: { realizedPnlToday: -2500 },
+            triggeredRules: [
+                {
+                    rule: 'max_daily_loss_pct',
+                    detail: 'realized -2.5% today against a 2.0% limit',
+                    activeUntil: '2026-07-03T04:00:00.000Z',
+                },
+            ],
+        });
+
+        const tool = getTool('get_circuit_breaker')!;
+        const result = (await tool.execute({}, { userId: 'u1' })) as {
+            recommendation: string;
+            triggeredRules: { rule: string }[];
+            note: string;
+        };
+
+        expect(evaluateBreakerForUser).toHaveBeenCalledWith('u1');
+        expect(result.recommendation).toBe('HALTED');
+        // A verdict with no rule attached cannot be argued with; the rule is what makes it checkable.
+        expect(result.triggeredRules[0].rule).toBe('max_daily_loss_pct');
+        expect(result.note).toMatch(/blocked/);
+    });
+
+    it('does not let an allowed state read as a recommendation to buy', async () => {
+        evaluateBreakerForUser.mockResolvedValue({
+            recommendation: 'TRADING_ALLOWED',
+            dataQuality: 'OK',
+            rationale: 'no rule triggered',
+            metrics: { realizedPnlToday: 0 },
+            triggeredRules: [],
+        });
+
+        const tool = getTool('get_circuit_breaker')!;
+        const result = (await tool.execute({}, { userId: 'u1' })) as { note: string };
+
+        // "Allowed" is the account's state, not advice. Left unstated, a model reliably upgrades it.
+        expect(result.note).toMatch(/not a recommendation/i);
     });
 });
