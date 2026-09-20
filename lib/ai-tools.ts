@@ -741,6 +741,61 @@ export const AI_TOOLS: AITool[] = [
             };
         },
     },
+    {
+        spec: {
+            name: 'assess_vcp',
+            description:
+                'Assess a stock for a Minervini volatility-contraction pattern: the 7-point Stage 2 trend template and the contraction sequence, with the pivot and stop the pattern defines. Use it for "is X setting up", "tight base", "Stage 2", or "volatility contraction" questions. Both parts are deterministic, so report what it returns rather than forming your own read.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    symbol: { type: 'string', description: 'Stock ticker, e.g. "NVDA".' },
+                },
+                required: ['symbol'],
+            },
+        },
+        execute: async (args) => {
+            const symbol = str(args, 'symbol').toUpperCase();
+
+            const [{ getStockPriceHistory }, { detectVcp, trendTemplate }] = await Promise.all([
+                import('@/lib/actions/screener.actions'),
+                import('@/lib/vcp'),
+            ]);
+
+            // Two years: the template needs a year of history and the contraction window another
+            // three months before it, so a one-year fetch would silently disqualify every candidate.
+            const bars = await getStockPriceHistory(symbol, '2y');
+            if (!bars || bars.length === 0) throw new Error(`No price history for ${symbol}.`);
+
+            const template = trendTemplate(bars.map((bar) => bar.c));
+            const vcp = detectVcp(bars);
+            if (!template || !vcp) {
+                throw new Error(`${symbol} does not have enough history for a VCP assessment.`);
+            }
+
+            return {
+                symbol,
+                trendTemplate: {
+                    passed: template.passed,
+                    total: template.total,
+                    checks: template.checks,
+                },
+                vcp: {
+                    valid: vcp.valid,
+                    contractions: vcp.contractions.map((contraction) => ({
+                        depthPct: Number(contraction.depthPct.toFixed(1)),
+                    })),
+                    pivot: vcp.pivot,
+                    stop: vcp.stop,
+                    riskPct: vcp.riskPct === null ? null : Number(vcp.riskPct.toFixed(2)),
+                    dryUpBand: vcp.dryUpBand,
+                    reasons: vcp.reasons,
+                },
+                note:
+                    'A valid pattern is a *setup*, not a signal: the entry is a move through the pivot on above-average volume, and the stop belongs below the last contraction low. Say which of those is missing rather than presenting the pattern as a reason to buy.',
+            };
+        },
+    },
 ];
 
 const TOOL_BY_NAME = new Map(AI_TOOLS.map((tool) => [tool.spec.name, tool]));
