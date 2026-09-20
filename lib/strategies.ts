@@ -29,6 +29,20 @@ export interface Criterion {
     detail: string;
 }
 
+/**
+ * The market an asset is being judged against.
+ *
+ * Relative strength is the asset's own move minus the benchmark's over the same window: being up
+ * 8% means something different when the index did 12%. Without a benchmark the screener could only
+ * measure an asset against itself, so a strong-looking mover in a weak tape and a laggard in a
+ * strong one looked identical.
+ */
+export interface BenchmarkContext {
+    /** Shown in the criterion label, e.g. "SPY" or "BTC". */
+    symbol: string;
+    change30d: number;
+}
+
 export interface StrategyResult {
     score: number;
     tier: 'Strong' | 'Moderate' | 'Watch';
@@ -43,7 +57,7 @@ export interface StrategyDef {
     id: StrategyId;
     name: string;
     summary: string;
-    evaluate: (bundle: IndicatorBundle) => Criterion[];
+    evaluate: (bundle: IndicatorBundle, benchmark?: BenchmarkContext | null) => Criterion[];
 }
 
 function pct(value: number | null, digits = 1): string {
@@ -60,12 +74,45 @@ function tierFor(score: number): StrategyResult['tier'] {
     return 'Watch';
 }
 
+/**
+ * Leadership versus the benchmark over the same 30-day window.
+ *
+ * Only added when a run has a benchmark. Without one there is nothing to be relative to, and
+ * silently passing or failing the asset would credit or blame it for a gap that is not its own.
+ * Within a single screener run the benchmark is the same for every asset, so the denominator stays
+ * consistent down the table — which is what makes the scores comparable to each other rather than
+ * just individually plausible.
+ */
+function relativeStrengthCriterion(b: IndicatorBundle, benchmark?: BenchmarkContext | null): Criterion[] {
+    if (!benchmark) return [];
+
+    const label = `Ahead of ${benchmark.symbol} over 30 days`;
+
+    // Unreachable from the screener, which drops anything without 200 bars before it gets here. Kept
+    // as a failing criterion rather than an omission so the denominator cannot silently change
+    // between rows.
+    if (b.change30d === null) {
+        return [{ label, passed: false, detail: 'needs 30 bars of history' }];
+    }
+
+    const spread = b.change30d - benchmark.change30d;
+    const signed = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(1)}`;
+
+    return [
+        {
+            label,
+            passed: spread > 0,
+            detail: `${signed(b.change30d)}% vs ${signed(benchmark.change30d)}% ${benchmark.symbol} (${signed(spread)}pt)`,
+        },
+    ];
+}
+
 export const STRATEGIES: StrategyDef[] = [
     {
         id: 'trend-following',
         name: 'Trend Following',
         summary: 'Established uptrend: the 50-day average has crossed above the 200-day and both are rising.',
-        evaluate: (b) => [
+        evaluate: (b, benchmark) => [
             {
                 label: '50-day average above 200-day',
                 passed: b.sma50 !== null && b.sma200 !== null && b.sma50 > b.sma200,
@@ -85,13 +132,14 @@ export const STRATEGIES: StrategyDef[] = [
                     ? `${num(b.sma200Prior)} → ${num(b.sma200)} over 20 bars`
                     : 'needs 220 bars of history',
             },
+            ...relativeStrengthCriterion(b, benchmark),
         ],
     },
     {
         id: 'momentum',
         name: 'Momentum',
         summary: 'MACD has turned bullish while RSI sits in the healthy 50-70 band — strength without being stretched.',
-        evaluate: (b) => [
+        evaluate: (b, benchmark) => [
             {
                 label: 'MACD above signal line',
                 passed: Boolean(b.macd && b.macd.macd > b.macd.signal),
@@ -107,6 +155,7 @@ export const STRATEGIES: StrategyDef[] = [
                 passed: b.sma50 !== null && b.price > b.sma50,
                 detail: b.sma50 !== null ? `price ${num(b.price)} vs 50d ${num(b.sma50)}` : 'needs 50 bars of history',
             },
+            ...relativeStrengthCriterion(b, benchmark),
         ],
     },
     {
@@ -201,9 +250,14 @@ export function getStrategy(id: string | undefined): StrategyDef {
  * conditions"). Criteria that cannot be evaluated (insufficient history) count as not
  * met, which keeps scores comparable across assets.
  */
-export function runStrategy(bundle: IndicatorBundle, strategyId: StrategyId): StrategyResult {
+export function runStrategy(
+    bundle: IndicatorBundle,
+    strategyId: StrategyId,
+    /** Omitted when the run had no benchmark — see relativeStrengthCriterion. */
+    benchmark?: BenchmarkContext | null
+): StrategyResult {
     const strategy = getStrategy(strategyId);
-    const criteria = strategy.evaluate(bundle);
+    const criteria = strategy.evaluate(bundle, benchmark);
 
     const passed = criteria.filter((criterion) => criterion.passed);
     const failed = criteria.filter((criterion) => !criterion.passed);

@@ -59,6 +59,50 @@ describe('strategy registry', () => {
   });
 });
 
+describe('relative strength', () => {
+  const bundle = () => computeIndicators(series(uptrend()))!;
+
+  it('adds no criterion when the run has no benchmark', () => {
+    // Backwards compatible on purpose: with no reference there is nothing to be relative to, and a
+    // fabricated pass or fail would blame the asset for a data gap that is not its own.
+    const criteria = getStrategy('trend-following').evaluate(bundle());
+    expect(criteria).toHaveLength(3);
+    expect(criteria.some((c) => c.label.includes('30 days'))).toBe(false);
+  });
+
+  it('adds exactly one criterion when a benchmark is supplied', () => {
+    const criteria = getStrategy('trend-following').evaluate(bundle(), { symbol: 'SPY', change30d: 1 });
+    expect(criteria).toHaveLength(4);
+    expect(criteria[3].label).toContain('SPY');
+  });
+
+  it('passes when the asset leads and fails when it lags', () => {
+    const asset = bundle();
+    const behind = asset.change30d! - 5;
+    const ahead = asset.change30d! + 5;
+
+    expect(getStrategy('momentum').evaluate(asset, { symbol: 'SPY', change30d: behind })[3].passed).toBe(true);
+    expect(getStrategy('momentum').evaluate(asset, { symbol: 'SPY', change30d: ahead })[3].passed).toBe(false);
+  });
+
+  it('states the spread, not just the verdict', () => {
+    const criterion = getStrategy('momentum').evaluate(bundle(), { symbol: 'BTC', change30d: 2.5 })[3];
+    expect(criterion.detail).toContain('vs +2.5% BTC');
+    expect(criterion.detail).toContain('pt');
+  });
+
+  it('lowers the score when the same asset lags its benchmark', () => {
+    const asset = bundle();
+    const alone = runStrategy(asset, 'momentum');
+    const lagging = runStrategy(asset, 'momentum', { symbol: 'SPY', change30d: asset.change30d! + 50 });
+
+    // One extra criterion, not met: the denominator grows and the numerator does not.
+    expect(lagging.total).toBe(alone.total + 1);
+    expect(lagging.matched).toBe(alone.matched);
+    expect(lagging.score).toBeLessThan(alone.score);
+  });
+});
+
 describe('scoring', () => {
   it('is 100 and "Strong" when every criterion passes', () => {
     const bundle = computeIndicators(series(uptrend()))!;

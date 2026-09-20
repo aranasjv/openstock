@@ -6,6 +6,7 @@ import { computeIndicators, type Candle } from '@/lib/indicators';
 import {
     runStrategy,
     STRATEGIES,
+    type BenchmarkContext,
     isStrategyId,
     DEFAULT_STRATEGY_ID,
     type Criterion,
@@ -30,6 +31,33 @@ import type { AIProviderName } from '@/lib/ai-provider';
 const DEFAULT_YAHOO_CHART_BASE = 'https://query1.finance.yahoo.com/v8/finance/chart';
 const REQUEST_TIMEOUT_MS = 10_000;
 const CONCURRENCY = 4;
+
+/**
+ * The reference each run measures relative strength against: SPY for stocks, BTC for crypto.
+ *
+ * Returns null rather than throwing when it cannot be built. A missing benchmark costs one
+ * criterion for every row in the run, which is a much smaller failure than losing the screen — and
+ * because the omission is run-wide, the remaining scores still share a denominator and stay
+ * comparable to each other.
+ */
+async function loadBenchmark(assetType: 'stock' | 'crypto'): Promise<BenchmarkContext | null> {
+    try {
+        const candles =
+            assetType === 'crypto'
+                ? await getCryptoPriceHistory('bitcoin')
+                : await getStockPriceHistory('SPY');
+
+        if (!candles) return null;
+
+        const bundle = computeIndicators(candles);
+        if (!bundle || bundle.change30d === null) return null;
+
+        return { symbol: assetType === 'crypto' ? 'BTC' : 'SPY', change30d: bundle.change30d };
+    } catch (error) {
+        console.warn('Screener: benchmark unavailable, relative strength omitted:', error);
+        return null;
+    }
+}
 
 /** A playbook used as an explanation persona is capped so one call cannot blow up the bill. */
 const MAX_PLAYBOOK_SYSTEM_CHARS = 12_000;
@@ -214,6 +242,10 @@ async function runScreenerUncached(
         };
     }
 
+    // One benchmark per run, not one per asset: it is the same series every time, and fetching it
+    // inside the loop would multiply one cached call by the size of the universe.
+    const benchmark = await loadBenchmark(assetType);
+
     const analyses = await mapWithConcurrency(universe, CONCURRENCY, async (entry) => {
         try {
             const candles =
@@ -226,7 +258,7 @@ async function runScreenerUncached(
             const bundle = computeIndicators(candles);
             if (!bundle) return null;
 
-            const result = runStrategy(bundle, strategyId);
+            const result = runStrategy(bundle, strategyId, benchmark);
 
             const name =
                 assetType === 'crypto' ? entry.name : await getStockName(entry.symbol);
@@ -344,7 +376,10 @@ export async function explainCandidate(
         const bundle = computeIndicators(candles);
         if (!bundle) return { ok: false, error: 'Not enough history to analyse this asset.' };
 
-        const result = runStrategy(bundle, strategyId);
+        // The explanation is generated for a row the user is looking at, so it is judged against the
+        // same benchmark the screen used — otherwise the write-up would describe a different asset
+        // than the one in the table.
+        const result = runStrategy(bundle, strategyId, await loadBenchmark(assetType));
         const strategy = STRATEGIES.find((s) => s.id === strategyId) ?? STRATEGIES[0];
 
         const config = await loadConfig();
