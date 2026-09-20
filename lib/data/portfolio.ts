@@ -4,6 +4,7 @@ import { connectToDatabase } from '@/database/mongoose';
 import { HoldingModel } from '@/database/models/holding.model';
 import { getQuote } from '@/lib/actions/finnhub.actions';
 import { getCryptoMarketsByIds } from '@/lib/actions/crypto.actions';
+import { MAX_LIST_ITEMS } from '@/lib/validate';
 
 /**
  * Holdings data access.
@@ -51,7 +52,7 @@ export async function getHoldingsForUser(userId: string, assetType?: HoldingAsse
     try {
         await connectToDatabase();
         const filter = assetType ? { userId, assetType } : { userId };
-        const holdings = await HoldingModel.find(filter).sort({ addedAt: -1 });
+        const holdings = await HoldingModel.find(filter).sort({ addedAt: -1 }).limit(MAX_LIST_ITEMS);
         return JSON.parse(JSON.stringify(holdings));
     } catch (error) {
         console.error('Error fetching holdings:', error);
@@ -158,7 +159,7 @@ export async function getPortfolioSummaryForUser(
     try {
         await connectToDatabase();
         const filter = assetType ? { userId, assetType } : { userId };
-        const records = await HoldingModel.find(filter).lean();
+        const records = await HoldingModel.find(filter).limit(MAX_LIST_ITEMS).lean();
 
         if (records.length === 0) return empty;
 

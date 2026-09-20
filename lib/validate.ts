@@ -16,6 +16,16 @@ export const MAX_TEXT_LENGTH = 120;
 /** Ticker symbols and CoinGecko ids are short; anything longer is not one. */
 export const MAX_SYMBOL_LENGTH = 40;
 
+/**
+ * Ceiling on any list returned to a client.
+ *
+ * Nothing bounded these before: a watchlist, holdings list or alert list returned however many
+ * rows the account had accumulated, and every one of them is serialised into the payload of
+ * each page that renders it. A cap far above any realistic portfolio still means the failure
+ * mode is a truncated list rather than a page that grows without limit.
+ */
+export const MAX_LIST_ITEMS = 500;
+
 export function requireText(value: unknown, field: string, maxLength = MAX_TEXT_LENGTH): string {
     if (typeof value !== 'string') throw new Error(`${field} must be text.`);
 

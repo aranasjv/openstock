@@ -5,6 +5,7 @@ import { POPULAR_STOCK_SYMBOLS } from '@/lib/constants';
 import { loadConfig } from '@/lib/config';
 import { cache } from 'react';
 import { fetchWithTimeout } from '@/lib/http';
+import { mapWithConcurrency } from '@/lib/concurrency';
 
 const DEFAULT_FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
 
@@ -143,8 +144,9 @@ export async function getEarningsCalendar(symbol: string, daysBack = 7, daysForw
 export async function getWatchlistData(symbols: string[]) {
     if (!symbols || symbols.length === 0) return [];
 
-    // Fetch quotes and profiles in parallel
-    const promises = symbols.map(async (sym) => {
+    // Bounded rather than unbounded: `symbols.map(...)` fired two requests per symbol at once, so
+    // a sixty-symbol watchlist became a hundred and twenty simultaneous calls at one vendor.
+    return mapWithConcurrency(symbols, 6, async (sym) => {
         const [quote, profile] = await Promise.all([
             getQuote(sym),
             getCompanyProfile(sym)
@@ -161,8 +163,6 @@ export async function getWatchlistData(symbols: string[]) {
             marketCap: profile?.marketCapitalization,
         };
     });
-
-    return await Promise.all(promises);
 }
 
 
@@ -183,18 +183,18 @@ export async function getNews(symbols?: string[]): Promise<MarketNewsArticle[]> 
         if (cleanSymbols.length > 0) {
             const perSymbolArticles: Record<string, RawNewsArticle[]> = {};
 
-            await Promise.all(
-                cleanSymbols.map(async (sym) => {
-                    try {
-                        const url = `${baseUrl}/company-news?symbol=${encodeURIComponent(sym)}&from=${range.from}&to=${range.to}&token=${token}`;
-                        const articles = await fetchJSON<RawNewsArticle[]>(url, 300);
-                        perSymbolArticles[sym] = (articles || []).filter(validateArticle);
-                    } catch (e) {
-                        console.error('Error fetching company news for', sym, e);
-                        perSymbolArticles[sym] = [];
-                    }
-                })
-            );
+            // Capped at four in flight: this fired one request per symbol at once, so a large
+            // watchlist could exhaust the Finnhub rate limit inside a single page render.
+            await mapWithConcurrency(cleanSymbols, 4, async (sym) => {
+                try {
+                    const url = `${baseUrl}/company-news?symbol=${encodeURIComponent(sym)}&from=${range.from}&to=${range.to}&token=${token}`;
+                    const articles = await fetchJSON<RawNewsArticle[]>(url, 300);
+                    perSymbolArticles[sym] = (articles || []).filter(validateArticle);
+                } catch (e) {
+                    console.error('Error fetching company news for', sym, e);
+                    perSymbolArticles[sym] = [];
+                }
+            });
 
             const collected: MarketNewsArticle[] = [];
             // Round-robin up to 6 picks

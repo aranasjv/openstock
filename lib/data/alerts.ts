@@ -2,7 +2,7 @@ import 'server-only';
 
 import { connectToDatabase } from '@/database/mongoose';
 import { Alert } from '@/database/models/alert.model';
-import { isObjectId } from '@/lib/validate';
+import { isObjectId, MAX_LIST_ITEMS } from '@/lib/validate';
 
 /**
  * Alert data access.
@@ -48,7 +48,7 @@ export async function getAlertsForUser(userId: string, assetType?: AlertAssetTyp
     try {
         await connectToDatabase();
         const filter = assetType ? { userId, assetType } : { userId };
-        const alerts = await Alert.find(filter).sort({ createdAt: -1 });
+        const alerts = await Alert.find(filter).sort({ createdAt: -1 }).limit(MAX_LIST_ITEMS);
         return JSON.parse(JSON.stringify(alerts));
     } catch (error) {
         console.error('Error fetching alerts:', error);

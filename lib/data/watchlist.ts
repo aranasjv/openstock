@@ -2,6 +2,7 @@ import 'server-only';
 
 import { connectToDatabase } from '@/database/mongoose';
 import { Watchlist } from '@/database/models/watchlist.model';
+import { MAX_LIST_ITEMS } from '@/lib/validate';
 
 /**
  * Watchlist data access.
@@ -55,7 +56,7 @@ export async function getWatchlistForUser(userId: string, assetType?: WatchlistA
     try {
         await connectToDatabase();
         const filter = assetType ? { userId, assetType } : { userId };
-        const watchlist = await Watchlist.find(filter).sort({ addedAt: -1 });
+        const watchlist = await Watchlist.find(filter).sort({ addedAt: -1 }).limit(MAX_LIST_ITEMS);
         return JSON.parse(JSON.stringify(watchlist));
     } catch (error) {
         console.error('Error fetching watchlist:', error);
