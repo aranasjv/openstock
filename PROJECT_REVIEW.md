@@ -94,21 +94,21 @@ as an empty portfolio. *A7* — malformed ids are rejected before Mongoose sees 
 
 | # | Finding | Evidence | Rule | Fix |
 |---|---|---|---|---|
-| A1 | **No fetch timeout on Finnhub, the AI providers, or Kit.** CoinGecko, Yahoo, Telegram, Adanos all have one. | `finnhub.actions.ts:54`; `ai-provider.ts`; `kit.ts:35` | — | Shared `AbortController` helper. |
-| A2 | **A DB outage renders as "no data"** — an error looks like an empty list. | `watchlist.actions.ts:66`; `holdings.actions.ts:195`; `alert.actions.ts:39` | — | Distinguish empty from failed; surface degraded state. |
-| A3 | **Unbounded outbound fan-out** — one request per symbol, no cap. | `finnhub.actions.ts:103,130` | — | Cap the list length. |
-| A4 | **Unbounded DB reads** — no `.limit()` on list queries. | `alert.actions.ts:38`; `watchlist.actions.ts:64,108`; `holdings.actions.ts:37,151` | — | `.limit()` + pagination. |
-| A5 | **Per-process state undocumented for the CoinGecko gate and the scheduler.** | `crypto.actions.ts:55-56`; `scheduler.ts:214` | `server-no-shared-module-state` | Document and enforce single-replica, or move to a shared store. The rule is violated on purpose; say so. |
+| A1 ✔ | **No fetch timeout on Finnhub, the AI providers, or Kit.** CoinGecko, Yahoo, Telegram, Adanos all have one. | `finnhub.actions.ts:54`; `ai-provider.ts`; `kit.ts:35` | — | Shared `AbortController` helper. |
+| A2 ✔ | **A DB outage renders as "no data"** — an error looks like an empty list. | `watchlist.actions.ts:66`; `holdings.actions.ts:195`; `alert.actions.ts:39` | — | Distinguish empty from failed; surface degraded state. |
+| A3 ✔ | **Unbounded outbound fan-out** — one request per symbol, no cap. | `finnhub.actions.ts:103,130` | — | Cap the list length. |
+| A4 ✔ | **Unbounded DB reads** — no `.limit()` on list queries. | `alert.actions.ts:38`; `watchlist.actions.ts:64,108`; `holdings.actions.ts:37,151` | — | `.limit()` + pagination. |
+| A5 ✔ | **Per-process state undocumented for the CoinGecko gate and the scheduler.** | `crypto.actions.ts:55-56`; `scheduler.ts:214` | `server-no-shared-module-state` | Document and enforce single-replica, or move to a shared store. The rule is violated on purpose; say so. |
 
 ### Correctness
 
 | # | Finding | Evidence | Rule | Fix |
 |---|---|---|---|---|
-| A6 | **Sequential awaits over independent work.** | `jobs/alert-check.ts:132` (one update per alert); `inngest/functions.ts:271` (per-user loop) | `async-parallel` | `bulkWrite` / `Promise.all` with a concurrency cap. |
-| A7 | **Invalid `ObjectId` throws unhandled `CastError`.** | `assistant.actions.ts:70,103` | — | Validate and catch, as `sendMessage` does. |
-| A8 | **The re-engagement job no-ops in production** — one personal email is the only real send target. | `inngest/functions.ts:369,372-374` | — | Implement or remove; do not report success while doing nothing. |
-| A9 | **Validation is inconsistent** — only the assistant caps input length. | `assistant.actions.ts:128` vs `watchlist.actions.ts:11` | `server-auth-actions` (adjacent) | `assertLength` at the action boundary. |
-| A10 | **`peRatio` is faked with `0`.** | `finnhub.actions.ts:103+` | — | Fetch `/stock/metric`, or render `—`. Rendering a wrong `0` is worse than a blank. |
+| A6 ✔ | **Sequential awaits over independent work.** | `jobs/alert-check.ts:132` (one update per alert); `inngest/functions.ts:271` (per-user loop) | `async-parallel` | `bulkWrite` / `Promise.all` with a concurrency cap. |
+| A7 ✔ | **Invalid `ObjectId` throws unhandled `CastError`.** | `assistant.actions.ts:70,103` | — | Validate and catch, as `sendMessage` does. |
+| A8 ✔ | **The re-engagement job no-ops in production** — one personal email is the only real send target. | `inngest/functions.ts:369,372-374` | — | Implement or remove; do not report success while doing nothing. |
+| A9 ✔ | **Validation is inconsistent** — only the assistant caps input length. | `assistant.actions.ts:128` vs `watchlist.actions.ts:11` | `server-auth-actions` (adjacent) | `assertLength` at the action boundary. |
+| A10 ✔ | **`peRatio` is faked with `0`.** | `finnhub.actions.ts:103+` | — | Fetch `/stock/metric`, or render `—`. Rendering a wrong `0` is worse than a blank. |
 
 ### Already following the rules (keep it that way)
 
@@ -124,8 +124,8 @@ as an empty portfolio. *A7* — malformed ids are rejected before Mongoose sees 
 
 | # | Finding |
 |---|---|
-| A11 | `lib/actions/*` is almost entirely untested — exactly where S1–S3 live. Only `screener.actions.ts` (`explainCandidate`) has coverage. |
-| A12 | No coverage for `lib/config.ts`, `lib/jobs/*`, `lib/inngest/*`. |
+| A11 ✔ | `lib/actions/*` is almost entirely untested — exactly where S1–S3 live. Only `screener.actions.ts` (`explainCandidate`) has coverage. |
+| A12 ✔ | No coverage for `lib/config.ts`, `lib/jobs/*`, `lib/inngest/*`. |
 
 **Recommendation:** one authorization test per personal action — "a spoofed `userId` cannot
 touch another user's document". That single pattern would have caught S1–S3.
@@ -362,33 +362,33 @@ curated property list, so this satisfies "list properties explicitly").
 
 | # | Finding | Rule | Evidence |
 |---|---|---|---|
-| U1 | **Meaningful text in `gray-600`/`gray-700` — invisible.** Disclaimers, empty states, table labels, captions. Move meaningful copy to `gray-500` or lighter. | Accessibility / contrast (AA) | `layout/Sidebar.tsx:90,97,123`; `screener/MustBuySection.tsx:40,49`; `screener/CandidateRow.tsx:75,102,143,150,188`; `assistant/ConversationList.tsx:57,75`; `assistant/ChatPanel.tsx:195`; `crypto/TopCoinsTable.tsx:71,104` |
-| U2 | **No visible keyboard focus** on hand-rolled buttons and links. Only the shadcn `ui/*` primitives have rings. | Focus States: "Interactive elements need visible focus: `focus-visible:ring-*`" | `ChatPanel.tsx:98`; `ConversationList.tsx:64,79`; `CandidateRow.tsx:79,93,168`; `SidebarNav.tsx:53`; `WatchlistTabs.tsx:39` |
+| U1 ✔ | **Meaningful text in `gray-600`/`gray-700` — invisible.** Disclaimers, empty states, table labels, captions. Move meaningful copy to `gray-500` or lighter. | Accessibility / contrast (AA) | `layout/Sidebar.tsx:90,97,123`; `screener/MustBuySection.tsx:40,49`; `screener/CandidateRow.tsx:75,102,143,150,188`; `assistant/ConversationList.tsx:57,75`; `assistant/ChatPanel.tsx:195`; `crypto/TopCoinsTable.tsx:71,104` |
+| U2 ✔ | **No visible keyboard focus** on hand-rolled buttons and links. Only the shadcn `ui/*` primitives have rings. | Focus States: "Interactive elements need visible focus: `focus-visible:ring-*`" | `ChatPanel.tsx:98`; `ConversationList.tsx:64,79`; `CandidateRow.tsx:79,93,168`; `SidebarNav.tsx:53`; `WatchlistTabs.tsx:39` |
 
 ### Major
 
 | # | Finding | Rule | Evidence |
 |---|---|---|---|
-| U3 | **Icon-only buttons with no accessible name.** | Accessibility: "Icon-only buttons need `aria-label`"; anti-pattern list | `ChatPanel.tsx:186` (send); `holdings/HoldingsManager.tsx:165` (add); `watchlist/AlertsPanel.tsx:63` (delete) |
-| U4 | **Numbers are neither aligned nor tabular.** | Typography: "`font-variant-numeric: tabular-nums` for number columns/comparisons" | `WatchlistTable.tsx:80-82,117-126` (left-aligned); `HoldingsManager.tsx:189-220`, `TopCoinsTable.tsx:49-50,96,99` (right but proportional) |
-| U5 | **Controls reachable only by hover.** | Touch & Interaction: gestures need tap/click and keyboard alternatives; anti-pattern list | `ConversationList.tsx:84` (`opacity-0 group-hover:opacity-100`); `TradingViewWidget.tsx:80` |
-| U6 | **The coin drawer traps no focus, restores none, and keeps an Escape listener mounted while closed.** | Touch: "`overscroll-behavior: contain` in modals/drawers"; Focus States: sticky overlays must not cover the focused element | `crypto/CoinDetailDrawer.tsx:84-92,98` |
-| U7 | **Table rows are mouse-only click targets.** | Anti-patterns: "`<div>`/`<span>` with click handlers (should be `<button>`)"; "Inline `onClick` navigation without `<a>`" | `crypto/TopCoinsTable.tsx:65-68` |
-| U8 | **Silent void states** — components return `null` instead of an empty state, so a failure looks like the feature does not exist. | Content Handling: "Handle empty states—don't render broken UI for empty strings/arrays" | `watchlist/NewsGrid.tsx:19`; `stocks/StockSentimentCard.tsx:43` |
-| U9 | **Destructive actions are immediate or use a blocking native `confirm()`.** The conversation delete has no confirmation at all. | Navigation & State: "Destructive actions need confirmation modal or undo window—never immediate" | `watchlist/AlertsPanel.tsx:15`; `assistant/ConversationList.tsx:79-86` |
+| U3 ✔ | **Icon-only buttons with no accessible name.** | Accessibility: "Icon-only buttons need `aria-label`"; anti-pattern list | `ChatPanel.tsx:186` (send); `holdings/HoldingsManager.tsx:165` (add); `watchlist/AlertsPanel.tsx:63` (delete) |
+| U4 ✔ | **Numbers are neither aligned nor tabular.** | Typography: "`font-variant-numeric: tabular-nums` for number columns/comparisons" | `WatchlistTable.tsx:80-82,117-126` (left-aligned); `HoldingsManager.tsx:189-220`, `TopCoinsTable.tsx:49-50,96,99` (right but proportional) |
+| U5 ✔ | **Controls reachable only by hover.** | Touch & Interaction: gestures need tap/click and keyboard alternatives; anti-pattern list | `ConversationList.tsx:84` (`opacity-0 group-hover:opacity-100`); `TradingViewWidget.tsx:80` |
+| U6 ✔ | **The coin drawer traps no focus, restores none, and keeps an Escape listener mounted while closed.** | Touch: "`overscroll-behavior: contain` in modals/drawers"; Focus States: sticky overlays must not cover the focused element | `crypto/CoinDetailDrawer.tsx:84-92,98` |
+| U7 ✔ | **Table rows are mouse-only click targets.** | Anti-patterns: "`<div>`/`<span>` with click handlers (should be `<button>`)"; "Inline `onClick` navigation without `<a>`" | `crypto/TopCoinsTable.tsx:65-68` |
+| U8 ✔ | **Silent void states** — components return `null` instead of an empty state, so a failure looks like the feature does not exist. | Content Handling: "Handle empty states—don't render broken UI for empty strings/arrays" | `watchlist/NewsGrid.tsx:19`; `stocks/StockSentimentCard.tsx:43` |
+| U9 ✔ | **Destructive actions are immediate or use a blocking native `confirm()`.** The conversation delete has no confirmation at all. | Navigation & State: "Destructive actions need confirmation modal or undo window—never immediate" | `watchlist/AlertsPanel.tsx:15`; `assistant/ConversationList.tsx:79-86` |
 
 ### Minor
 
 | # | Finding | Rule | Evidence |
 |---|---|---|---|
-| U10 | Colour-only signalling: RSI tone is a bare coloured number (meaning only in a hover `title`); the sidebar pick tier never spells the tier. | Accessibility | `CandidateRow.tsx:109-113`; `layout/SidebarPickRows.tsx:44-53` |
-| U11 | Form controls without labels: holdings inputs and the chat textarea rely on placeholders; `CreateAlertModal` labels have no `htmlFor`. | Accessibility: "Form controls need `<label>` or `aria-label`"; anti-pattern "Form inputs without labels" | `HoldingsManager.tsx:117-163`; `ChatPanel.tsx:179`; `CreateAlertModal.tsx:89,100,114,127,141` |
-| U12 | **`color-scheme: dark` is never set.** Dark themes need it to fix native scrollbars and form controls (Windows dark mode especially). | Dark Mode & Theming | absent from `app/globals.css` and `app/layout.tsx` |
-| U13 | **`transition-all` throughout** — must list properties explicitly; it animates layout properties too. | Animation: "Never `transition: all`—list properties explicitly"; anti-pattern list | `ui/button.tsx:8`; `WatchlistButton.tsx:76`; `TradingViewWidget.tsx:63,79`; `crypto/CryptoWatchlistChip.tsx:32`; `watchlist/WatchlistStockChip.tsx:45`; `WatchlistTable.tsx:137`; `CreateAlertModal.tsx:94,150,167` |
-| U14 | **Hardcoded number formats** — `.toFixed(2)` with literal `$`/`T`/`B`/`M`/`K` suffixes instead of `Intl.NumberFormat` compact notation. `Intl` *is* used elsewhere in the same file, so this is inconsistent as well as non-localised. | Locale & i18n: "Numbers/currency: use `Intl.NumberFormat` not hardcoded formats" | `lib/utils.ts:32-35,128-131` |
-| U15 | Watchlist table clips on mobile — no `overflow-x-auto`, unlike the holdings table. | Safe Areas & Layout: "Avoid unwanted scrollbars… fix content overflow" | `watchlist/WatchlistTable.tsx:74` |
-| U16 | Missing `DialogDescription` on the alert modal (Radix a11y warning). | Accessibility | `watchlist/CreateAlertModal.tsx:81-83` |
-| U17 | Code defects: invalid class `text-gray-4`; no-op `focus: text-white` (stray space); dead ternary. | — | `UserDropdown.tsx:37`; `forms/SelectField.tsx:30`; `WatchlistButton.tsx:38-41` |
+| U10 ✔ | Colour-only signalling: RSI tone is a bare coloured number (meaning only in a hover `title`); the sidebar pick tier never spells the tier. | Accessibility | `CandidateRow.tsx:109-113`; `layout/SidebarPickRows.tsx:44-53` |
+| U11 ✔ | Form controls without labels: holdings inputs and the chat textarea rely on placeholders; `CreateAlertModal` labels have no `htmlFor`. | Accessibility: "Form controls need `<label>` or `aria-label`"; anti-pattern "Form inputs without labels" | `HoldingsManager.tsx:117-163`; `ChatPanel.tsx:179`; `CreateAlertModal.tsx:89,100,114,127,141` |
+| U12 ✔ | **`color-scheme: dark` is never set.** Dark themes need it to fix native scrollbars and form controls (Windows dark mode especially). | Dark Mode & Theming | absent from `app/globals.css` and `app/layout.tsx` |
+| U13 ✔ | **`transition-all` throughout** — must list properties explicitly; it animates layout properties too. | Animation: "Never `transition: all`—list properties explicitly"; anti-pattern list | `ui/button.tsx:8`; `WatchlistButton.tsx:76`; `TradingViewWidget.tsx:63,79`; `crypto/CryptoWatchlistChip.tsx:32`; `watchlist/WatchlistStockChip.tsx:45`; `WatchlistTable.tsx:137`; `CreateAlertModal.tsx:94,150,167` |
+| U14 ✔ | **Hardcoded number formats** — `.toFixed(2)` with literal `$`/`T`/`B`/`M`/`K` suffixes instead of `Intl.NumberFormat` compact notation. `Intl` *is* used elsewhere in the same file, so this is inconsistent as well as non-localised. | Locale & i18n: "Numbers/currency: use `Intl.NumberFormat` not hardcoded formats" | `lib/utils.ts:32-35,128-131` |
+| U15 ✔ | Watchlist table clips on mobile — no `overflow-x-auto`, unlike the holdings table. | Safe Areas & Layout: "Avoid unwanted scrollbars… fix content overflow" | `watchlist/WatchlistTable.tsx:74` |
+| U16 ✔ | Missing `DialogDescription` on the alert modal (Radix a11y warning). | Accessibility | `watchlist/CreateAlertModal.tsx:81-83` |
+| U17 ✔ | Code defects: invalid class `text-gray-4`; no-op `focus: text-white` (stray space); dead ternary. | — | `UserDropdown.tsx:37`; `forms/SelectField.tsx:30`; `WatchlistButton.tsx:38-41` |
 
 ### What is already right (keep it)
 
@@ -411,10 +411,10 @@ generated-page tell, and at `gray-700` currently invisible anyway.
 |---|---|
 | **P0 — done** | S1–S4 (access control) + the authorization tests (A11) in the same change. |
 | **P1 — done** | UI blockers U1, U2, U3, U12, U13 (cheap, app-wide); A1 (fetch timeouts); A2 (degrade honestly); A7/A9 (validate + guard). |
-| **P2 — the AI layer** | §2.9 phase A (bridge + two tools) → phase B (`position-sizer`, `crypto-regime-analyzer`, relative strength); U4–U9, U14, U15, A6, A10. |
-| **P3 — persistence** | §2.6 thesis/journal model, then the four skills it unlocks. |
-| **P4 — depth** | Phases E–F: equity breadth, uptrend, exposure-coach; VCP/CANSLIM engines; backtest engine. |
-| **P5 — polish** | Remaining U/A minors; portfolio risk (beta, correlation, concentration). |
+| **P2 — done** | §2.9 phase A (bridge + two tools) → phase B (`position-sizer`, `crypto-regime-analyzer`, relative strength); U4–U9, U14, U15, A6, A10. |
+| **P3 — done** | §2.6 thesis/journal model, then the four skills it unlocks. |
+| **P4 — partly done** | backtest engine ✔; equity breadth, uptrend, exposure-coach, VCP/CANSLIM engines still open. |
+| **P5 — done** | Remaining U/A minors; portfolio risk (beta, correlation, concentration). |
 
 Everything in P2+ has its method already specified in `.agents/skills/` and is readable by the
 running app through `lib/analysis-skills.ts` — so the same playbook can drive the implementation,
