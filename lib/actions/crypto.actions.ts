@@ -76,6 +76,12 @@ function scheduleRequest(path: string): Promise<void> {
     const spacing = spacingFor(path);
 
     const scheduled = requestChain.then(async () => {
+        // Leave the queue entirely while the quota is exhausted. Without this every queued
+        // symbol still pays its spacing slice — two seconds each for a market_chart — before
+        // discovering what the first 429 already established, which is a quarter of a minute of
+        // a twelve-symbol scan spent waiting to be told the same thing.
+        if (Date.now() < rateLimitedUntil) return;
+
         const elapsed = Date.now() - lastRequestAt;
         if (elapsed < spacing) {
             await new Promise((resolve) => setTimeout(resolve, spacing - elapsed));
@@ -103,9 +109,10 @@ async function fetchCoinGecko<T>(path: string, revalidateSeconds?: number): Prom
     const baseUrl = (config.COINGECKO_API_BASE_URL || DEFAULT_COINGECKO_BASE_URL).replace(/\/$/, '');
     const apiKey = config.COINGECKO_API_KEY || '';
 
-    // Two attempts rather than three: with Retry-After clamped at 15s, a third attempt let a
-    // single symbol occupy the serialised gate for half a minute.
-    const MAX_ATTEMPTS = 2;
+    // One attempt only. A 429 is a quota error, not a blip: sleeping out the Retry-After inside
+    // a page render buys nothing, because the window it asks for (up to 15s) is longer than the
+    // render can afford to wait. The breaker below stops every other caller instead.
+    const MAX_ATTEMPTS = 1;
 
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
         // The quota is shared, so once the breaker has tripped there is nothing to gain by
@@ -115,6 +122,14 @@ async function fetchCoinGecko<T>(path: string, revalidateSeconds?: number): Prom
         }
 
         await scheduleRequest(path);
+
+        // Checked again *after* the gate. The screener issues its coin-history requests
+        // concurrently, so they all pass the check above before the first 429 has come back —
+        // and each then waits its two-second turn in the queue to discover the same thing. This
+        // second check is what actually stops the remaining symbols.
+        if (Date.now() < rateLimitedUntil) {
+            return null;
+        }
 
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -131,19 +146,16 @@ async function fetchCoinGecko<T>(path: string, revalidateSeconds?: number): Prom
             const res = await fetch(`${baseUrl}${path}`, options);
 
             if (res.status === 429) {
-                const delay = retryDelayMs(res, attempt);
-
-                // Trip the breaker for every caller, not just this one.
-                rateLimitedUntil = Math.max(rateLimitedUntil, Date.now() + delay);
-
-                if (attempt === MAX_ATTEMPTS - 1) {
-                    console.warn(`CoinGecko rate limited (429) for ${path}; giving up`);
-                    return null;
-                }
-
-                console.warn(`CoinGecko rate limited (429) for ${path}; retrying in ${delay}ms`);
-                await new Promise((resolve) => setTimeout(resolve, delay));
-                continue;
+                // Trip the breaker for every caller and give this one up immediately.
+                //
+                // Waiting the Retry-After out here is what made a cold crypto page take 38
+                // seconds: every symbol paid it in turn, and the first one paid it twice
+                // because the breaker expired exactly as the sleep ended. The screener already
+                // reports degraded output, so returning now renders the page and the next load,
+                // after the window, tries again.
+                rateLimitedUntil = Math.max(rateLimitedUntil, Date.now() + retryDelayMs(res, attempt));
+                console.warn(`CoinGecko rate limited (429) for ${path}; skipping until the window resets`);
+                return null;
             }
 
             if (!res.ok) {
