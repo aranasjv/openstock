@@ -210,6 +210,50 @@ function coinIdsParam(ids: string[]): string {
         .join(',');
 }
 
+export interface CryptoGlobal {
+    /** BTC's share of total crypto market cap, as a percentage. */
+    btcDominance: number;
+    ethDominance: number;
+    totalMarketCapUsd: number;
+    /** 24h change in total market cap, which is a breadth proxy in one number. */
+    marketCapChange24h: number;
+}
+
+/**
+ * Market-wide totals from CoinGecko `/global`.
+ *
+ * The only free source of BTC dominance. Note it returns the *current* value and nothing else —
+ * there is no history endpoint on the free tier — which is why the regime engine needs a store
+ * rather than a fetch. Cached for five minutes: it moves slowly and every page load asking for it
+ * would spend quota the screener needs.
+ */
+export async function getCryptoGlobal(): Promise<CryptoGlobal | null> {
+    const payload = await fetchCoinGecko<{
+        data?: {
+            market_cap_percentage?: Record<string, number>;
+            total_market_cap?: { usd?: number };
+            market_cap_change_percentage_24h_usd?: number;
+        };
+    }>('/global', 300);
+
+    const data = payload?.data;
+    if (!data) return null;
+
+    const btcDominance = data.market_cap_percentage?.btc;
+    const totalMarketCapUsd = data.total_market_cap?.usd;
+
+    // Dominance is the component's whole point, so a response without it is a failure rather than
+    // a partial success — returning 0 here would read as "no BTC dominance at all".
+    if (!Number.isFinite(btcDominance) || !Number.isFinite(totalMarketCapUsd)) return null;
+
+    return {
+        btcDominance: btcDominance as number,
+        ethDominance: data.market_cap_percentage?.eth ?? 0,
+        totalMarketCapUsd: totalMarketCapUsd as number,
+        marketCapChange24h: data.market_cap_change_percentage_24h_usd ?? 0,
+    };
+}
+
 /**
  * Top coins by market cap. Cached for 5 minutes and reused by both the dashboard
  * table and the empty-query search results, so a page render costs at most one call.
