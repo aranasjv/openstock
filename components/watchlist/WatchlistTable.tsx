@@ -76,9 +76,9 @@ export default function WatchlistTable({ data, onRefresh }: WatchlistTableProps)
                     <tr>
                         <th className="px-6 py-4 font-semibold tracking-wide">Company</th>
                         <th className="px-6 py-4 font-semibold tracking-wide">Symbol</th>
-                        <th className="px-6 py-4 font-semibold tracking-wide">Price</th>
-                        <th className="px-6 py-4 font-semibold tracking-wide">Change</th>
-                        <th className="px-6 py-4 font-semibold tracking-wide">Market Cap</th>
+                        <th className="px-6 py-4 text-right font-semibold tracking-wide">Price</th>
+                        <th className="px-6 py-4 text-right font-semibold tracking-wide">Change</th>
+                        <th className="px-6 py-4 text-right font-semibold tracking-wide">Market Cap</th>
                         <th className="px-6 py-4 text-right font-semibold tracking-wide">Actions</th>
                     </tr>
                 </thead>
@@ -113,16 +113,16 @@ export default function WatchlistTable({ data, onRefresh }: WatchlistTableProps)
                                         {stock.symbol}
                                     </span>
                                 </td>
-                                <td className="px-6 py-4 text-white font-medium text-base tracking-tight">
+                                <td className="px-6 py-4 text-right font-medium text-base tracking-tight text-white tabular-nums">
                                     {formatCurrency(stock.price)}
                                 </td>
-                                <td className={`px-6 py-4 font-medium`}>
-                                    <div className={`flex items-center w-fit px-2 py-1 rounded-md ${isPositive ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
+                                <td className="px-6 py-4 text-right font-medium">
+                                    <div className={`inline-flex items-center px-2 py-1 rounded-md tabular-nums ${isPositive ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
                                         {isPositive ? <ArrowUp className="w-3.5 h-3.5 mr-1.5" /> : <ArrowDown className="w-3.5 h-3.5 mr-1.5" />}
                                         {Math.abs(stock.changePercent).toFixed(2)}%
                                     </div>
                                 </td>
-                                <td className="px-6 py-4 text-gray-400 font-medium">
+                                <td className="px-6 py-4 text-right font-medium text-gray-400 tabular-nums">
                                     {formatNumber(stock.marketCap)}
                                 </td>
                                 <td className="px-6 py-4 text-right">

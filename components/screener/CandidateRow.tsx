@@ -29,7 +29,11 @@ const TIER_STYLES: Record<string, string> = {
 function rsiBand(rsi: number | null): { label: string; className: string; tone: string } | null {
     if (rsi === null || !Number.isFinite(rsi)) return null;
 
-    const label = `RSI ${rsi.toFixed(0)}`;
+    // Colour alone carried the meaning, and the tone existed only in a hover title — so the
+    // signal was unavailable to anyone who cannot see the colour, or cannot hover. The arrow is
+    // a second channel: shape survives greyscale, colour-blindness and a screenshot.
+    const arrow = rsi >= 70 ? ' ▲' : rsi <= 40 ? ' ▼' : '';
+    const label = `RSI ${rsi.toFixed(0)}${arrow}`;
     if (rsi <= 30) return { label, className: 'bg-emerald-950/60 text-emerald-300', tone: 'Oversold' };
     if (rsi <= 40) return { label, className: 'bg-emerald-950/30 text-emerald-400/80', tone: 'Approaching oversold' };
     if (rsi >= 70) return { label, className: 'bg-red-950/50 text-red-300', tone: 'Overbought' };

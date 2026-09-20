@@ -202,18 +202,18 @@ export default function HoldingsManager({ holdings }: HoldingsManagerProps) {
                                                 {row.assetType === 'crypto' ? 'coin' : 'stock'}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3 text-right font-mono text-gray-300">{row.quantity}</td>
-                                        <td className="px-4 py-3 text-right font-mono text-gray-300">
+                                        <td className="px-4 py-3 text-right font-mono tabular-nums text-gray-300">{row.quantity}</td>
+                                        <td className="px-4 py-3 text-right font-mono tabular-nums text-gray-300">
                                             {formatMoney(row.averageCost, row.assetType)}
                                         </td>
-                                        <td className="px-4 py-3 text-right font-mono text-gray-300">
+                                        <td className="px-4 py-3 text-right font-mono tabular-nums text-gray-300">
                                             {row.price === null ? (
                                                 <span className="text-yellow-600">n/a</span>
                                             ) : (
                                                 formatMoney(row.price, row.assetType)
                                             )}
                                         </td>
-                                        <td className="px-4 py-3 text-right font-mono text-gray-100">
+                                        <td className="px-4 py-3 text-right font-mono tabular-nums text-gray-100">
                                             {row.marketValue === null ? '—' : formatMoney(row.marketValue, row.assetType)}
                                         </td>
                                         <td className="px-4 py-3 text-right">

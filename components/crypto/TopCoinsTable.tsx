@@ -93,10 +93,10 @@ export default function TopCoinsTable({ coins }: TopCoinsTableProps) {
                                                 </span>
                                             </div>
                                         </td>
-                                        <td className="whitespace-nowrap px-2 py-1.5 text-right font-mono text-[11px] text-gray-100">
+                                        <td className="whitespace-nowrap px-2 py-1.5 text-right font-mono text-[11px] tabular-nums text-gray-100">
                                             {formatCryptoPrice(coin.currentPrice)}
                                         </td>
-                                        <td className={`whitespace-nowrap px-2 py-1.5 text-right text-[11px] font-medium ${changeClass}`}>
+                                        <td className={`whitespace-nowrap px-2 py-1.5 text-right text-[11px] font-medium tabular-nums ${changeClass}`}>
                                             {change === null || change === undefined
                                                 ? 'N/A'
                                                 : `${change >= 0 ? '+' : ''}${change.toFixed(1)}%`}

@@ -37,7 +37,8 @@ export default function SidebarPickRows({ picks, isCrypto }: SidebarPickRowsProp
                             {isCrypto ? formatCryptoPrice(pick.price) : formatPrice(pick.price)}
                         </span>
                         <span
-                            className={`shrink-0 rounded px-1 text-[10px] ${
+                            title={`${pick.tier} · score ${pick.score}`}
+                            className={`shrink-0 whitespace-nowrap rounded px-1 text-[10px] ${
                                 pick.tier === 'Strong'
                                     ? 'bg-emerald-950/60 text-emerald-300'
                                     : pick.tier === 'Moderate'
@@ -45,7 +46,7 @@ export default function SidebarPickRows({ picks, isCrypto }: SidebarPickRowsProp
                                         : 'bg-gray-800 text-gray-400'
                             }`}
                         >
-                            {pick.score}
+                            {pick.tier} {pick.score}
                         </span>
                     </>
                 );
