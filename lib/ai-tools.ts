@@ -796,6 +796,46 @@ export const AI_TOOLS: AITool[] = [
             };
         },
     },
+    {
+        spec: {
+            name: 'get_market_breadth',
+            description:
+                'US equity market breadth: a 0-100 composite over six components (breadth level and trend, the 8MA/200MA crossover, peak-trough cycle position, bearish-signal status, historical percentile, and S&P divergence) with a zone and exposure guidance. Use it for "how healthy is this market" questions about US stocks. It is deterministic — report its output rather than forming your own view, and report the components that disagree as well as the headline.',
+            parameters: { type: 'object', properties: {} },
+        },
+        execute: async () => {
+            const { marketBreadthReport } = await import('@/lib/breadth-data');
+            const report = await marketBreadthReport();
+
+            if (!report) {
+                throw new Error(
+                    'The market breadth source could not be read. Say the reading is unavailable rather than estimating it.'
+                );
+            }
+
+            return {
+                score: report.composite.score,
+                zone: report.composite.zone,
+                exposure: report.composite.exposure,
+                guidance: report.composite.guidance,
+                actions: report.composite.actions,
+                referenceOnly: report.composite.referenceOnly,
+                quality: report.composite.quality,
+                strongest: report.composite.strongest,
+                weakest: report.composite.weakest,
+                components: report.components.map((component) => ({
+                    key: component.key,
+                    score: component.score,
+                    signal: component.signal,
+                })),
+                period: report.period,
+                asOf: report.asOf,
+                note: report.composite.referenceOnly
+                    ? 'No component could be computed from the published series, so this score is a reference value rather than a reading. Say that instead of reporting it as a market view.'
+                    : 'Deterministic, from the market-breadth-analyzer playbook. Report the zone, the exposure guidance and the components that disagree — the disagreements are where the signal is.',
+            };
+        },
+    },
 ];
 
 const TOOL_BY_NAME = new Map(AI_TOOLS.map((tool) => [tool.spec.name, tool]));

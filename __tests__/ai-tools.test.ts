@@ -89,9 +89,9 @@ beforeEach(() => {
 });
 
 describe('tool registry shape', () => {
-    it('exposes seventeen tools', () => {
-        expect(getToolSpecs()).toHaveLength(17);
-        expect(AI_TOOLS).toHaveLength(17);
+    it('exposes eighteen tools', () => {
+        expect(getToolSpecs()).toHaveLength(18);
+        expect(AI_TOOLS).toHaveLength(18);
     });
 
     it('gives every tool a unique, non-empty name and description', () => {

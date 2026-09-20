@@ -3,6 +3,7 @@ import 'server-only';
 import { loadConfig } from '@/lib/config';
 import { fetchWithTimeout } from '@/lib/http';
 import { parseBreadthCsv, parseBreadthSummary, type BreadthRow } from '@/lib/breadth-csv';
+import { assessBreadth, type BreadthAssessment } from '@/lib/breadth-components';
 
 /**
  * Fetches the market-breadth series published by the `market-breadth-analyzer` skill's upstream
@@ -76,4 +77,34 @@ export async function fetchBreadthSummary(): Promise<Record<string, string> | nu
         console.warn('Breadth: could not read the summary CSV:', error instanceof Error ? error.message : error);
         return null;
     }
+}
+
+export interface BreadthReport extends BreadthAssessment {
+    asOf: string;
+    /** How much history the reading is built on. */
+    rows: number;
+    period: { from: string; to: string } | null;
+}
+
+/**
+ * The whole breadth reading, or null when the source could not be read.
+ *
+ * **null rather than a defaulted "Neutral 50"**, for the same reason the fetchers return null rather
+ * than an empty array: a defaulted reading is indistinguishable from a measured one, and this number
+ * is meant to inform exposure. A caller that cannot tell those apart will treat a broken feed as a
+ * neutral market, which is the one input that looks safe and is not.
+ *
+ * The summary is optional — components 1-4 and 6 need only the daily rows, and only C5 uses the
+ * historical averages — so a summary failure degrades one component instead of the whole reading.
+ */
+export async function marketBreadthReport(): Promise<BreadthReport | null> {
+    const [rows, summary] = await Promise.all([fetchBreadthSeries(), fetchBreadthSummary()]);
+    if (!rows) return null;
+
+    return {
+        ...assessBreadth(rows, summary ?? {}),
+        asOf: new Date().toISOString(),
+        rows: rows.length,
+        period: { from: rows[0].date, to: rows[rows.length - 1].date },
+    };
 }
