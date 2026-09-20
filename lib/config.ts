@@ -441,6 +441,25 @@ export const CONFIG_SCHEMA: SettingDef[] = [
         default: '8',
         type: 'number',
     },
+
+    // ── Market data sources ─────────────────────────────────────────
+    {
+        key: 'BREADTH_DETAIL_URL',
+        group: 'screener',
+        env: ['BREADTH_DETAIL_URL'],
+        label: 'Breadth CSV (detail)',
+        description:
+            'Daily market-breadth series used by the equity breadth model. Defaults to the series the market-breadth-analyzer skill points at (tradermonty/market-breadth-analysis on GitHub Pages). Configurable because it is a third-party URL: if the host moves, that should be a setting rather than a release.',
+        default: '',
+    },
+    {
+        key: 'BREADTH_SUMMARY_URL',
+        group: 'screener',
+        env: ['BREADTH_SUMMARY_URL'],
+        label: 'Breadth CSV (summary)',
+        description: 'The peak/trough summary that accompanies the detail CSV. Leave blank for the skill\'s default.',
+        default: '',
+    },
 ];
 
 const SCHEMA_BY_KEY = new Map(CONFIG_SCHEMA.map((def) => [def.key, def]));
