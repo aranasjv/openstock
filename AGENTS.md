@@ -176,16 +176,37 @@ Normalize **only** in `lib/ai-provider.ts`; nothing above it should know which p
 - **Stocks**: Finnhub for search/profile/quotes/news. Price **history** comes from Yahoo's
   unofficial chart endpoint (`YAHOO_CHART_BASE_URL`) because Finnhub candles need a paid
   plan. Treat it as unreliable — a failure marks one symbol unavailable, never the page.
-- **Crypto**: CoinGecko. The free tier rate-limits hard, which is why
-  `lib/actions/crypto.actions.ts` has a **serialized request gate** (2s spacing for
-  `market_chart`, 250ms otherwise), 429 backoff honouring `Retry-After`, and a 6h cache on
-  price history. Do not parallelize CoinGecko calls; that is what caused ~⅓ of a cold scan
-  to fail. Prefer CoinGecko data/symbols over guessed values.
+- **Crypto**: CoinGecko. The free tier rate-limits hard, so
+  `lib/actions/crypto.actions.ts` serializes every call through one gate, spaces `market_chart`
+  requests (**2s anonymously, 250ms once `COINGECKO_API_KEY` is set**), and **trips a
+  process-wide breaker on a 429**: for the window the API asks for, every caller returns
+  immediately instead of queueing up to be told the same thing. Do not parallelize CoinGecko
+  calls; that is what caused ~⅓ of a cold scan to fail. Prefer CoinGecko data/symbols over
+  guessed values.
 - The screener (`lib/actions/screener.actions.ts`) is cached for `SCREENER_CACHE_SECONDS`
   via `lib/screener-cache.ts`. Empty/degraded results are intentionally **not** cached so a
   transient rate-limit doesn't pin an empty dashboard for an hour.
 - `lib/strategies.ts` is the deterministic ranking. AI only writes explanations; it must
   never change which assets appear or their order.
+
+### Per-process state (single-instance assumption)
+
+These are module-level and **per process**. They are correct for the current deployment — one
+container, one replica — and each one quietly stops being correct the moment there are two.
+Nothing in the code enforces this, so it is on you to either pin `replicas: 1` or externalize
+them before scaling out.
+
+| State | Where | What breaks with a second replica |
+|---|---|---|
+| CoinGecko request gate | `crypto.actions.ts` | Each replica spaces its own calls, so the shared quota is hit at 2× |
+| 429 breaker | `crypto.actions.ts` | One backs off while the other keeps hammering the exhausted quota |
+| Screener cache | `lib/screener-cache.ts` | Cold cache per replica — the expensive scan happens N times, not once |
+| Assistant rate limiter | `lib/rate-limit.ts` | Per-user limits become per-replica, so they are effectively N× as loose |
+| Alert + digest + report scheduler | `lib/scheduler.ts` | Two schedulers send **duplicate** messages. `jobstate` is shared, but `lastRunAt` is read and then written, so the two can race |
+
+`jobstate` (last run + last outcome per job) is the one piece of this that already lives in
+Mongo. `/api/health` reports it, which is how you tell a job that stopped running from one that
+is running and failing.
 
 ## Notifications & jobs
 
