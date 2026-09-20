@@ -17,6 +17,7 @@ const SIDEBAR_ORDER = [
     '/',
     '/assistant',
     '/crypto',
+    '/journal',
     '/watchlist',
     '/holdings',
     '/settings',

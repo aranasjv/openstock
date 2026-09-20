@@ -22,6 +22,26 @@ export type ThesisStatus = (typeof THESIS_STATUSES)[number];
 /** Terminal states have no exits at all — not even to each other. */
 export const TERMINAL_STATUSES: readonly ThesisStatus[] = ['CLOSED', 'INVALIDATED'];
 
+/**
+ * The vocabularies, kept here rather than in the model so a client component can offer them as
+ * options without importing mongoose. The model re-exports them for server-side callers.
+ */
+export const THESIS_TYPES = [
+    'dividend_income',
+    'growth_momentum',
+    'mean_reversion',
+    'earnings_drift',
+    'pivot_breakout',
+] as const;
+
+export type ThesisType = (typeof THESIS_TYPES)[number];
+
+export const EXIT_REASONS = ['stop_hit', 'target_hit', 'time_stop', 'invalidated', 'manual'] as const;
+export type ExitReason = (typeof EXIT_REASONS)[number];
+
+export const REVIEW_STATUSES = ['OK', 'WARN', 'REVIEW'] as const;
+export type ReviewStatusName = (typeof REVIEW_STATUSES)[number];
+
 export function isTerminal(status: ThesisStatus): boolean {
     return TERMINAL_STATUSES.includes(status);
 }

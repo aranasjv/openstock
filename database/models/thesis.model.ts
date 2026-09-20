@@ -1,5 +1,15 @@
 import { Schema, model, models, type Document, type Model } from 'mongoose';
-import { THESIS_STATUSES, type ThesisLedgerEntry, type ThesisStatus } from '@/lib/thesis-lifecycle';
+import {
+    EXIT_REASONS,
+    REVIEW_STATUSES,
+    THESIS_STATUSES,
+    THESIS_TYPES,
+    type ExitReason,
+    type ReviewStatusName,
+    type ThesisLedgerEntry,
+    type ThesisStatus,
+    type ThesisType,
+} from '@/lib/thesis-lifecycle';
 
 /**
  * A tracked trading thesis.
@@ -13,21 +23,11 @@ import { THESIS_STATUSES, type ThesisLedgerEntry, type ThesisStatus } from '@/li
  * ledger on read rather than stored alongside it, so the two cannot disagree about what happened.
  */
 
-export const THESIS_TYPES = [
-    'dividend_income',
-    'growth_momentum',
-    'mean_reversion',
-    'earnings_drift',
-    'pivot_breakout',
-] as const;
-
-export type ThesisType = (typeof THESIS_TYPES)[number];
-
-export const EXIT_REASONS = ['stop_hit', 'target_hit', 'time_stop', 'invalidated', 'manual'] as const;
-export type ExitReason = (typeof EXIT_REASONS)[number];
-
-export const REVIEW_STATUSES = ['OK', 'WARN', 'REVIEW'] as const;
-export type ReviewStatusName = (typeof REVIEW_STATUSES)[number];
+// Re-exported so server-side callers can reach the vocabularies through the model they already
+// import. Client components must import from `@/lib/thesis-lifecycle` instead — this module pulls in
+// mongoose, and reaching it from the browser bundle would ship the whole driver.
+export { EXIT_REASONS, REVIEW_STATUSES, THESIS_STATUSES, THESIS_TYPES } from '@/lib/thesis-lifecycle';
+export type { ExitReason, ReviewStatusName, ThesisType } from '@/lib/thesis-lifecycle';
 
 export interface ThesisPosition {
     /** Original opened quantity. Immutable once trimming starts — the ledger depends on it. */
