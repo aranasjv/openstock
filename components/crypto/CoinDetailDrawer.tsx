@@ -5,38 +5,55 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { X, ExternalLink, Loader2 } from 'lucide-react';
 import { getCryptoCoinDetail, getCryptoMarketSentiment } from '@/lib/actions/crypto.actions';
+import { isStockInWatchlist } from '@/lib/actions/watchlist.actions';
 import { resolveCryptoSymbols } from '@/lib/actions/tradingview.actions';
-import TradingViewWidget from '@/components/TradingViewWidget';
-import CryptoSentimentCard from '@/components/crypto/CryptoSentimentCard';
-import { CANDLE_CHART_WIDGET_CONFIG } from '@/lib/constants';
-import {
-    formatCompactNumber,
-    formatCryptoPrice,
-    formatMarketCapValue,
-} from '@/lib/utils';
+import CryptoDetailView from '@/components/crypto/CryptoDetailView';
+import { useDragSize } from '@/hooks/useDragSize';
+import { formatCryptoPrice } from '@/lib/utils';
 
 interface CoinDetailDrawerProps {
     coinId: string | null;
     onClose: () => void;
 }
 
+type MarketSentiment = { value: number; classification: string; updatedAt: number } | null;
+
 /**
  * Slide-over detail panel for a coin.
  *
- * Kept as a drawer rather than a navigation so the table stays visible — you can move down
- * the list inspecting coins without losing your place. The full page still exists at
- * /crypto/[id] for deep links and sharing, and is linked from here.
+ * The body is the same component the full page renders, so the drawer is no longer a summary
+ * that tells you to go and look at the page: the watchlist and alert controls, the
+ * technical-analysis widget and the stats are all here, and the link to the page is now a
+ * header icon rather than a footer, because it is a deep-link affordance rather than the way
+ * you are expected to read this.
+ *
+ * Default width is three times the original 440px, which is what makes room for the shared
+ * view's two-column layout. It resizes from its left edge — the edge that can move without
+ * detaching a right-anchored panel — and the width persists, because how wide you like a chart
+ * is a preference about you, not a property of the coin.
  */
 export default function CoinDetailDrawer({ coinId, onClose }: CoinDetailDrawerProps) {
     const [coin, setCoin] = useState<CryptoCoinDetail | null>(null);
     const [symbol, setSymbol] = useState<string | null>(null);
-    const [market, setMarket] = useState<{ value: number; classification: string; updatedAt: number } | null>(null);
+    const [market, setMarket] = useState<MarketSentiment>(null);
+    const [isInWatchlist, setIsInWatchlist] = useState(false);
     const [loading, setLoading] = useState(false);
+
+    const { width, resizing, startResize } = useDragSize({
+        storageKey: 'openstock:coin-drawer:width',
+        // 3 x the previous 440px default. Clamped by max-w-[95vw] at the call site so it stays
+        // reachable on a smaller screen than the one it was sized on.
+        initial: { width: 1320, height: 900 },
+        min: { width: 380, height: 0 },
+        max: { width: 1800, height: 0 },
+        axis: 'x',
+    });
 
     useEffect(() => {
         if (!coinId) {
             setCoin(null);
             setSymbol(null);
+            setIsInWatchlist(false);
             return;
         }
 
@@ -44,6 +61,7 @@ export default function CoinDetailDrawer({ coinId, onClose }: CoinDetailDrawerPr
         setLoading(true);
         setCoin(null);
         setSymbol(null);
+        setIsInWatchlist(false);
 
         // Market sentiment is market-wide, so it only needs fetching once per open.
         getCryptoMarketSentiment()
@@ -52,6 +70,14 @@ export default function CoinDetailDrawer({ coinId, onClose }: CoinDetailDrawerPr
             })
             .catch(() => {
                 /* context only — the card hides itself when absent */
+            });
+
+        isStockInWatchlist(coinId, 'crypto')
+            .then((result) => {
+                if (!cancelled) setIsInWatchlist(result);
+            })
+            .catch(() => {
+                /* the button falls back to its own state */
             });
 
         getCryptoCoinDetail(coinId)
@@ -87,7 +113,7 @@ export default function CoinDetailDrawer({ coinId, onClose }: CoinDetailDrawerPr
 
     return (
         <>
-            {/* Backdrop only on small screens, where the drawer would otherwise cover the table. */}
+            {/* Backdrop only below the width at which the drawer would otherwise cover the table. */}
             <div
                 className="fixed inset-0 z-40 bg-black/50 xl:hidden"
                 onClick={onClose}
@@ -95,11 +121,22 @@ export default function CoinDetailDrawer({ coinId, onClose }: CoinDetailDrawerPr
             />
 
             <aside
-                className="fixed right-0 top-0 z-50 flex h-screen w-full flex-col border-l border-gray-800 bg-black shadow-2xl sm:w-[440px]"
                 role="dialog"
                 aria-label={`${coin?.name ?? coinId} details`}
+                style={{ width }}
+                className="fixed top-0 right-0 z-50 flex h-screen max-w-[95vw] flex-col border-l border-gray-800 bg-black shadow-2xl"
             >
-                <div className="flex shrink-0 items-center justify-between border-b border-gray-800 px-4 py-3">
+                <div
+                    onPointerDown={startResize}
+                    role="separator"
+                    aria-orientation="vertical"
+                    aria-label="Resize details panel"
+                    className={`absolute top-0 left-0 z-10 h-full w-1.5 cursor-ew-resize transition-colors hover:bg-teal-500/40 ${
+                        resizing ? 'bg-teal-500/40' : ''
+                    }`}
+                />
+
+                <div className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-800 px-4 py-3">
                     <div className="flex min-w-0 items-center gap-2">
                         {coin?.image ? (
                             <Image
@@ -114,105 +151,75 @@ export default function CoinDetailDrawer({ coinId, onClose }: CoinDetailDrawerPr
                         <div className="min-w-0">
                             <div className="truncate text-sm font-semibold text-white">
                                 {coin?.name ?? coinId}
+                                {coin?.symbol ? (
+                                    <span className="ml-2 text-[11px] font-normal text-gray-500">
+                                        {coin.symbol}
+                                    </span>
+                                ) : null}
                             </div>
                             <div className="text-[11px] text-gray-500">
-                                {coin?.symbol ?? ''}
-                                {coin?.marketCapRank ? ` · Rank #${coin.marketCapRank}` : ''}
+                                {coin?.marketCapRank ? `Rank #${coin.marketCapRank}` : ''}
                             </div>
                         </div>
                     </div>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="rounded p-1 text-gray-500 transition-colors hover:bg-white/10 hover:text-white"
-                        title="Close"
-                    >
-                        <X className="h-4 w-4" />
-                    </button>
-                </div>
 
-                <div className="min-h-0 flex-1 overflow-y-auto">
-                    {loading ? (
-                        <div className="flex h-40 items-center justify-center">
-                            <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
-                        </div>
-                    ) : coin ? (
-                        <div className="space-y-4 p-4">
-                            <div className="flex items-baseline gap-3">
-                                <span className="font-mono text-2xl text-white">
+                    <div className="flex shrink-0 items-center gap-3">
+                        {coin ? (
+                            <div className="flex items-baseline gap-2">
+                                <span className="font-mono text-sm text-white">
                                     {formatCryptoPrice(coin.currentPrice)}
                                 </span>
                                 {change !== null ? (
                                     <span
-                                        className={`text-sm font-medium ${change >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
+                                        className={`font-mono text-[11px] ${
+                                            change >= 0 ? 'text-emerald-400' : 'text-red-400'
+                                        }`}
                                     >
                                         {change >= 0 ? '+' : ''}
                                         {change.toFixed(2)}%
                                     </span>
                                 ) : null}
                             </div>
+                        ) : null}
 
-                            <div className="grid grid-cols-2 gap-3">
-                                {[
-                                    ['Market cap', formatMarketCapValue(coin.marketCap)],
-                                    ['Volume (24h)', formatCompactNumber(coin.totalVolume)],
-                                    ['24h high', coin.high24h ? formatCryptoPrice(coin.high24h) : 'N/A'],
-                                    ['24h low', coin.low24h ? formatCryptoPrice(coin.low24h) : 'N/A'],
-                                    ['All-time high', coin.ath ? formatCryptoPrice(coin.ath) : 'N/A'],
-                                    ['All-time low', coin.atl ? formatCryptoPrice(coin.atl) : 'N/A'],
-                                ].map(([label, value]) => (
-                                    <div key={label}>
-                                        <div className="text-[10px] uppercase tracking-wider text-gray-500">
-                                            {label}
-                                        </div>
-                                        <div className="font-mono text-xs text-gray-200">{value}</div>
-                                    </div>
-                                ))}
-                            </div>
+                        <Link
+                            href={`/crypto/${coinId}`}
+                            aria-label="Open full page"
+                            title="Open full page"
+                            className="rounded p-1 text-gray-500 transition-colors hover:bg-white/10 hover:text-white"
+                        >
+                            <ExternalLink className="h-4 w-4" />
+                        </Link>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            aria-label="Close"
+                            title="Close"
+                            className="rounded p-1 text-gray-500 transition-colors hover:bg-white/10 hover:text-white"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    </div>
+                </div>
 
-                            {symbol ? (
-                                <TradingViewWidget
-                                    scriptUrl="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js"
-                                    config={CANDLE_CHART_WIDGET_CONFIG(symbol)}
-                                    className="custom-chart"
-                                    height={280}
-                                />
-                            ) : (
-                                <p className="rounded-lg border border-gray-800 bg-gray-900/40 p-3 text-[11px] text-gray-500">
-                                    No TradingView pair exists for this coin, so no chart is shown.
-                                </p>
-                            )}
-
-                            {coin.description ? (
-                                <div>
-                                    <h3 className="mb-1 text-xs font-semibold text-gray-300">About</h3>
-                                    <p className="line-clamp-6 text-[11px] leading-relaxed text-gray-500">
-                                        {coin.description.replace(/<[^>]*>/g, '').trim()}
-                                    </p>
-                                </div>
-                            ) : null}
-
-                            <CryptoSentimentCard
-                                up={coin.sentimentUp}
-                                down={coin.sentimentDown}
-                                market={market}
-                            />
+                <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                    {loading ? (
+                        <div className="flex h-40 items-center justify-center">
+                            <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
                         </div>
+                    ) : coin ? (
+                        <CryptoDetailView
+                            coinId={coinId}
+                            coin={coin}
+                            marketSentiment={market}
+                            tvSymbol={symbol}
+                            isInWatchlist={isInWatchlist}
+                        />
                     ) : (
-                        <p className="p-4 text-xs text-gray-500">
+                        <p className="text-xs text-gray-500">
                             Details are unavailable for this coin right now.
                         </p>
                     )}
-                </div>
-
-                <div className="shrink-0 border-t border-gray-800 px-4 py-3">
-                    <Link
-                        href={`/crypto/${coinId}`}
-                        className="inline-flex items-center gap-1.5 text-xs text-teal-400 hover:text-teal-300"
-                    >
-                        Open full page
-                        <ExternalLink className="h-3 w-3" />
-                    </Link>
                 </div>
             </aside>
         </>

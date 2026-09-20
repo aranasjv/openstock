@@ -21,6 +21,11 @@ export interface DragSizeConfig {
     initial: { width: number; height: number };
     min: { width: number; height: number };
     max: { width: number; height: number };
+    /**
+     * 'x' for panels whose height is not theirs to choose — the detail drawer is h-screen, and
+     * letting it be dragged shorter would leave a gap under it. 'xy' for floating panels.
+     */
+    axis?: 'x' | 'xy';
 }
 
 export interface DragSize {
@@ -30,7 +35,7 @@ export interface DragSize {
     startResize: (event: React.PointerEvent<HTMLElement>) => void;
 }
 
-export function useDragSize({ storageKey, initial, min, max }: DragSizeConfig): DragSize {
+export function useDragSize({ storageKey, initial, min, max, axis = 'xy' }: DragSizeConfig): DragSize {
     const [size, setSize] = useState(initial);
     const [resizing, setResizing] = useState(false);
     const origin = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
@@ -73,12 +78,19 @@ export function useDragSize({ storageKey, initial, min, max }: DragSizeConfig): 
             if (!origin.current) return;
             // Top-left handle on a bottom-right-anchored panel: dragging up or left grows it,
             // so the delta is subtracted rather than added.
+            const width = clamp(
+                origin.current.width - (event.clientX - origin.current.x),
+                min.width,
+                max.width
+            );
+
+            if (axis === 'x') {
+                setSize((current) => ({ ...current, width }));
+                return;
+            }
+
             setSize({
-                width: clamp(
-                    origin.current.width - (event.clientX - origin.current.x),
-                    min.width,
-                    max.width
-                ),
+                width,
                 height: clamp(
                     origin.current.height - (event.clientY - origin.current.y),
                     min.height,
@@ -99,7 +111,7 @@ export function useDragSize({ storageKey, initial, min, max }: DragSizeConfig): 
             window.removeEventListener('pointerup', stop);
             window.removeEventListener('pointercancel', stop);
         };
-    }, [resizing, min.width, max.width, min.height, max.height]);
+    }, [resizing, axis, min.width, max.width, min.height, max.height]);
 
     useEffect(() => {
         if (resizing) return;
