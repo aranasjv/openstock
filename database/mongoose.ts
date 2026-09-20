@@ -1,25 +1,39 @@
 import mongoose from "mongoose";
 import dns from 'dns';
-import { setDefaultAutoSelectFamily } from 'node:net';
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
 /**
  * Outbound networking fixes, needed in a container.
  *
- * Set Google DNS and force IPv4 to avoid querySrv ECONNREFUSED.
+ * Set Google DNS and prefer IPv4 to avoid querySrv ECONNREFUSED.
  *
- * Also disables Node 20's "Happy Eyeballs" address-family racing (autoSelectFamily): it
- * resolves every family and races them, and a container with no IPv6 route still receives
- * AAAA records — connecting to one does not fail fast, it black-holes until the whole request
- * times out. That is why `fetch` to api.telegram.org timed out (ETIMEDOUT) inside the
- * container while `wget` to the same URL returned 200; it was misread as a network block on
- * Telegram, but it was this client-side behaviour.
+ * **`net.setDefaultAutoSelectFamily(false)` used to be called here, and removing it is deliberate.**
+ * It was added because `fetch` to api.telegram.org timed out while `wget` to the same URL returned
+ * 200: a container with no IPv6 route still receives AAAA records, and Happy Eyeballs' fallback to a
+ * black-holed IPv6 address does not fail fast. Disabling the race fixed that.
  *
- * This runs here, at the top of the Node-only database module, rather than in
- * instrumentation.ts: Next.js compiles instrumentation for the edge runtime as well (the
- * middleware), where node:net/node:dns do not exist, and a static import there crashed every
- * middleware-matched route.
+ * It also broke the market-breadth CSV, and the isolation is worth recording because the two
+ * symptoms have opposite signs. Measured in this container against tradermonty.github.io:
+ *
+ *     no tuning            -> OK
+ *     ipv4first only       -> OK
+ *     autoselect disabled  -> Connect Timeout Error (tradermonty.github.io:443, 10000ms)
+ *
+ * The reason is the shape of the answer: GitHub Pages resolves to **four** A records. With the race
+ * disabled Node commits to the first address it is given, and when that one black-holes the host
+ * becomes unreachable — even though three others work and the same host resolved fine a moment
+ * earlier. A global switch that turns one vendor's bad luck into every vendor's problem is the wrong
+ * instrument, so it is gone.
+ *
+ * `ipv4first` is the half worth keeping: it makes IPv4 the address Happy Eyeballs tries *first*,
+ * which is the actual cause the Telegram diagnosis identified, without removing the fallback that
+ * lets an unreachable address be skipped. If Telegram regresses, the fix is a per-request dispatcher
+ * for Telegram specifically — not re-disabling this globally.
+ *
+ * This runs here, at the top of the Node-only database module, rather than in instrumentation.ts:
+ * Next.js compiles instrumentation for the edge runtime as well (the middleware), where node:dns
+ * does not exist, and a static import there crashed every middleware-matched route.
  */
 try {
     // This is often more effective than setServers for Node 17+
@@ -28,12 +42,7 @@ try {
     }
     dns.setServers(['8.8.8.8']);
 
-    // Prefer A records; the app already assumes IPv4 egress.
-    if (typeof setDefaultAutoSelectFamily === 'function') {
-        setDefaultAutoSelectFamily(false);
-    }
-
-    console.log('🌐 Outbound networking: IPv4 preferred, address-family racing disabled');
+    console.log('🌐 Outbound networking: IPv4 preferred');
 } catch (e) {
     console.error('Failed to set custom DNS:', e);
 }

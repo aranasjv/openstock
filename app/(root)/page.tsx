@@ -1,4 +1,5 @@
 import AskAiButton from "@/components/assistant/AskAiButton";
+import BreadthStrip from "@/components/breadth/BreadthStrip";
 import SearchCommand from "@/components/SearchCommand";
 import { searchStocks } from "@/lib/actions/finnhub.actions";
 import TradingViewWidget from "@/components/TradingViewWidget";
@@ -63,6 +64,11 @@ const Home = async ({ searchParams }: HomeProps) => {
                     />
                 </div>
             </header>
+
+            {/* Breadth sits between the header and the widgets: it is context for everything below
+                it, and the strip is its own Suspense boundary implicitly, so the page paints while
+                the third-party CSV resolves. It renders nothing at all if that fetch fails. */}
+            <BreadthStrip />
 
             <section className="grid shrink-0 gap-2 xl:grid-cols-3">
                 <TradingViewWidget

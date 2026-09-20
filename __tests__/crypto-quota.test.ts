@@ -31,6 +31,14 @@ describe('CoinGecko quota handling', () => {
             COINGECKO_API_BASE_URL: 'https://api.coingecko.com/api/v3',
             COINGECKO_API_KEY: '',
         };
+
+        // These tests exercise the real gate, which spaces requests ~2 seconds apart anonymously, so
+        // a test making three calls legitimately takes ~6 seconds — past vitest's 5-second default
+        // and into flake territory under load. The timeout is raised rather than the spacing faked:
+        // the pacing *is* the behaviour under test, and stubbing the clock to skip it would stop
+        // these from proving anything about it.
+        vi.setConfig({ testTimeout: 20_000 });
+
         vi.spyOn(console, 'warn').mockImplementation(() => undefined);
         vi.spyOn(console, 'error').mockImplementation(() => undefined);
     });

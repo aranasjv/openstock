@@ -37,6 +37,18 @@ async function urls(): Promise<{ detail: string; summary: string }> {
     };
 }
 
+/**
+ * undici reports every network failure as a bare "fetch failed" and puts the reason on `cause`.
+ * Without it the log cannot distinguish an unreachable host from an unresolvable one — which is the
+ * difference between waiting for the upstream and fixing our own networking.
+ */
+function describeError(error: unknown): string {
+    if (!(error instanceof Error)) return String(error);
+    const cause = error.cause;
+    const detail = cause instanceof Error ? cause.message : typeof cause === 'string' ? cause : '';
+    return detail ? `${error.message} (${detail})` : error.message;
+}
+
 /** Daily rows, oldest first, or null when the source could not be read. */
 export async function fetchBreadthSeries(): Promise<BreadthRow[] | null> {
     try {
@@ -55,7 +67,7 @@ export async function fetchBreadthSeries(): Promise<BreadthRow[] | null> {
         const rows = parseBreadthCsv(await response.text());
         return rows.length > 0 ? rows : null;
     } catch (error) {
-        console.warn('Breadth: could not read the detail CSV:', error instanceof Error ? error.message : error);
+        console.warn('Breadth: could not read the detail CSV:', describeError(error));
         return null;
     }
 }
@@ -74,7 +86,7 @@ export async function fetchBreadthSummary(): Promise<Record<string, string> | nu
         const parsed = parseBreadthSummary(await response.text());
         return Object.keys(parsed).length > 0 ? parsed : null;
     } catch (error) {
-        console.warn('Breadth: could not read the summary CSV:', error instanceof Error ? error.message : error);
+        console.warn('Breadth: could not read the summary CSV:', describeError(error));
         return null;
     }
 }
