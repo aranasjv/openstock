@@ -6,7 +6,8 @@ import { getFormattedTodayDate } from "@/lib/utils";
 import { callAIProviderWithFallback } from "@/lib/ai-provider";
 
 export const sendSignUpEmail = inngest.createFunction(
-    { id: 'sign-up-email', triggers: [{ event: 'app/user.created' }] },
+    { id: 'sign-up-email' },
+    { event: 'app/user.created' },
     async ({ event, step }) => {
         const userProfile = `
             - Country: ${event.data.country}
@@ -52,7 +53,8 @@ export const sendSignUpEmail = inngest.createFunction(
 
 // Rename to Weekly
 export const sendWeeklyNewsSummary = inngest.createFunction(
-    { id: 'weekly-news-summary', triggers: [{ event: 'app/send.weekly.news' }, { cron: '0 9 * * 1' }] }, // Every Monday at 9AM
+    { id: 'weekly-news-summary' },
+    [{ event: 'app/send.weekly.news' }, { cron: '0 9 * * 1' }], // Every Monday at 9AM
     async ({ step }) => {
         // Step 1: Fetch General Market News
         const articles = await step.run('fetch-general-news', async () => {
@@ -208,7 +210,8 @@ export const sendWeeklyNewsSummary = inngest.createFunction(
  * other — the worst possible bug for an alerting feature.
  */
 export const checkStockAlerts = inngest.createFunction(
-    { id: 'check-stock-alerts', triggers: [{ cron: '*/5 * * * *' }] }, // Run every 5 minutes
+    { id: 'check-stock-alerts' },
+    { cron: '*/5 * * * *' }, // Run every 5 minutes
     async ({ step }) => {
         return await step.run('run-alert-check', async () => {
             const { runAlertCheck } = await import('@/lib/jobs/alert-check');
@@ -218,7 +221,8 @@ export const checkStockAlerts = inngest.createFunction(
 );
 
 export const checkInactiveUsers = inngest.createFunction(
-    { id: 'check-inactive-users', triggers: [{ cron: '0 10 * * *' }] }, // Run every day at 10 AM
+    { id: 'check-inactive-users' },
+    { cron: '0 10 * * *' }, // Run every day at 10 AM
     async ({ step }) => {
         // Step 1: Fetch Inactive Users
         const inactiveUsers = await step.run('fetch-inactive-users', async () => {

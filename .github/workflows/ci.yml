@@ -39,10 +39,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # NOTE: `npm run lint` is intentionally not a gate. The repository has pre-existing
-      # lint errors in legacy files (scripts/*.js, components/DonatePopup.tsx,
-      # lib/kit.ts, ...), so gating on it would fail every run for reasons unrelated to the
-      # change under test. Fix that debt first, then add a lint step here.
+      # Types are checked here as well as during the build, because `next build` reports them as
+      # build errors with far less detail than tsc does and this step makes the failure
+      # unambiguous. It is only possible now that next.config.ts stopped setting
+      # `typescript.ignoreBuildErrors` — before that, nothing in this pipeline typechecked.
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      # NOTE: `npm run lint` is still intentionally not a gate. The repository has pre-existing
+      # lint errors in legacy files (scripts/*.js, components/DonatePopup.tsx, lib/kit.ts, ...),
+      # so gating on it would fail every run for reasons unrelated to the change under test.
+      # Fix that debt first, then add a lint step here.
       - name: Unit tests
         run: npm test
 
