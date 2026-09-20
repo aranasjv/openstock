@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/database/mongoose';
-import { getJobState, JOB_ALERTS, JOB_DIGEST } from '@/lib/scheduler';
+import { getJobState, JOB_ALERTS, JOB_DIGEST, JOB_REPORT, type JobState } from '@/lib/scheduler';
 import { listAnalysisSkills } from '@/lib/analysis-skills';
 
 /**
@@ -22,6 +22,23 @@ export const runtime = 'nodejs';
 /** A probe that hangs is a failed probe; do not let a stalled DB connect stall the check. */
 const DB_CHECK_TIMEOUT_MS = 5_000;
 
+/** The shape reported for every job, so a new one cannot drift from the others. */
+interface JobSummary {
+    lastRunAt: string | null;
+    status: string | null;
+    error: string | null;
+}
+
+const EMPTY_JOB: JobSummary = { lastRunAt: null, status: null, error: null };
+
+function toSummary(state: JobState): JobSummary {
+    return {
+        lastRunAt: state.lastRunAt?.toISOString() ?? null,
+        status: state.lastStatus,
+        error: state.lastError,
+    };
+}
+
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
     return new Promise<T>((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error('health: database check timed out')), ms);
@@ -42,12 +59,10 @@ export async function GET() {
     const startedAt = Date.now();
 
     let db: 'up' | 'down' = 'down';
-    let jobs: {
-        alerts: { lastRunAt: string | null; status: string | null; error: string | null };
-        digest: { lastRunAt: string | null; status: string | null; error: string | null };
-    } = {
-        alerts: { lastRunAt: null, status: null, error: null },
-        digest: { lastRunAt: null, status: null, error: null },
+    let jobs: Record<'alerts' | 'digest' | 'report', JobSummary> = {
+        alerts: EMPTY_JOB,
+        digest: EMPTY_JOB,
+        report: EMPTY_JOB,
     };
 
     try {
@@ -60,18 +75,15 @@ export async function GET() {
         );
         db = 'up';
 
-        const [alerts, digest] = await Promise.all([getJobState(JOB_ALERTS), getJobState(JOB_DIGEST)]);
+        const [alerts, digest, report] = await Promise.all([
+            getJobState(JOB_ALERTS),
+            getJobState(JOB_DIGEST),
+            getJobState(JOB_REPORT),
+        ]);
         jobs = {
-            alerts: {
-                lastRunAt: alerts.lastRunAt?.toISOString() ?? null,
-                status: alerts.lastStatus,
-                error: alerts.lastError,
-            },
-            digest: {
-                lastRunAt: digest.lastRunAt?.toISOString() ?? null,
-                status: digest.lastStatus,
-                error: digest.lastError,
-            },
+            alerts: toSummary(alerts),
+            digest: toSummary(digest),
+            report: toSummary(report),
         };
     } catch (error) {
         // Logged server-side only; the response stays free of driver internals.

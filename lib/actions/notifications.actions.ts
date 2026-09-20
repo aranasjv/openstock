@@ -40,6 +40,46 @@ export async function sendTestDigest(): Promise<{ ok: boolean; message: string }
     }
 }
 
+/**
+ * Run the AI report on demand.
+ *
+ * Deliberately does not check REPORT_ENABLED: the point of this button is to see what the
+ * report will say *before* switching the daily send on.
+ */
+export async function sendAssistantReportNow(): Promise<{ ok: boolean; message: string }> {
+    if (!(await isCurrentUserAdmin())) {
+        return { ok: false, message: 'Not authorised.' };
+    }
+
+    try {
+        const { runAssistantReport } = await import('@/lib/jobs/assistant-report');
+        const result = await runAssistantReport();
+
+        if (!result.ok) {
+            return {
+                ok: false,
+                message:
+                    result.error ??
+                    'Nothing was sent — check the AI provider key and the Telegram bot tokens.',
+            };
+        }
+
+        const total = result.characters.stocks + result.characters.crypto;
+        return {
+            ok: true,
+            message:
+                `AI report sent — stocks: ${result.sent.stocks ? 'yes' : 'no'}, ` +
+                `crypto: ${result.sent.crypto ? 'yes' : 'no'} (${total} characters` +
+                `${result.provider ? `, via ${result.provider}` : ''}).`,
+        };
+    } catch (error) {
+        return {
+            ok: false,
+            message: error instanceof Error ? error.message : 'AI report failed.',
+        };
+    }
+}
+
 export async function runAlertCheckNow(): Promise<{ ok: boolean; message: string }> {
     if (!(await isCurrentUserAdmin())) {
         return { ok: false, message: 'Not authorised.' };

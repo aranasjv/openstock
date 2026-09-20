@@ -37,6 +37,28 @@ export interface SettingDef {
     options?: string[];
 }
 
+/**
+ * Default prompt for the daily AI report.
+ *
+ * Kept here rather than inside the job so the settings UI can show the real default and a
+ * user can read exactly what will be sent before turning it on. `{market}` and `{date}` are
+ * substituted once per audience.
+ *
+ * It restates the assistant's own guardrails (live figures only, no advice) because the
+ * report is delivered to a chat with no human in the loop to catch a hallucinated price.
+ */
+export const DEFAULT_REPORT_PROMPT = [
+    "Write today's OpenStock briefing for {market} ({date}).",
+    '',
+    'Pull real numbers with your tools — never state a price from memory. Cover:',
+    '1. What the screener flags right now, and the one thing that matters most about it.',
+    '2. The market backdrop — trend, breadth and risk appetite — in two sentences.',
+    '3. What to watch in the next session, and what would invalidate that view.',
+    '',
+    'Plain text only: no markdown, no headings, no emoji, under 1200 characters. Describe',
+    'conditions and levels — no buy/sell advice and no price targets.',
+].join('\n');
+
 export const CONFIG_SCHEMA: SettingDef[] = [
     // ── AI ──────────────────────────────────────────────────────────
     {
@@ -229,6 +251,54 @@ export const CONFIG_SCHEMA: SettingDef[] = [
         default: 'both',
         type: 'select',
         options: ['both', 'stocks', 'crypto'],
+    },
+    {
+        key: 'REPORT_ENABLED',
+        group: 'notifications',
+        env: ['REPORT_ENABLED'],
+        label: 'Send the daily AI report',
+        description:
+            'The assistant writes a briefing from live data — the same tools and playbooks as /assistant — and posts it to Telegram. Costs one model call per audience per day, so it stays off until you turn it on.',
+        default: 'false',
+        type: 'select',
+        options: ['true', 'false'],
+    },
+    {
+        key: 'REPORT_HOUR',
+        group: 'notifications',
+        env: ['REPORT_HOUR'],
+        label: 'AI report hour (0-23)',
+        description: 'Hour of the day, in the digest timezone above. Blank falls back to the digest hour.',
+        default: '8',
+        type: 'number',
+    },
+    {
+        key: 'REPORT_MARKET',
+        group: 'notifications',
+        env: ['REPORT_MARKET'],
+        label: 'AI report audience',
+        description: 'Which chat receives a briefing. Each audience gets its own report, written for that market.',
+        default: 'both',
+        type: 'select',
+        options: ['both', 'stocks', 'crypto'],
+    },
+    {
+        key: 'REPORT_PROMPT',
+        group: 'notifications',
+        env: ['REPORT_PROMPT'],
+        label: 'AI report prompt',
+        description:
+            'What the assistant is asked to write. {market} and {date} are substituted. Editing this changes the report — it is the whole instruction.',
+        default: DEFAULT_REPORT_PROMPT,
+    },
+    {
+        key: 'REPORT_MAX_CHARS',
+        group: 'notifications',
+        env: ['REPORT_MAX_CHARS'],
+        label: 'AI report length cap',
+        description: 'Telegram splits long messages into several parts; this keeps the briefing to one message.',
+        default: '3000',
+        type: 'number',
     },
 
     // ── Email ───────────────────────────────────────────────────────

@@ -3,8 +3,8 @@
 import { useTransition } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Send, BellRing } from 'lucide-react';
-import { sendTestDigest, runAlertCheckNow } from '@/lib/actions/notifications.actions';
+import { Send, BellRing, Sparkles } from 'lucide-react';
+import { sendTestDigest, runAlertCheckNow, sendAssistantReportNow } from '@/lib/actions/notifications.actions';
 
 /**
  * Manual triggers for the scheduled jobs.
@@ -27,8 +27,9 @@ export default function NotificationActions() {
         <section className="rounded-xl border border-gray-800 bg-gray-900/30 p-5">
             <h2 className="mb-1 text-lg font-semibold text-white">Scheduled jobs</h2>
             <p className="mb-4 text-xs text-gray-500">
-                The scheduler runs inside the app process. Trigger either job now to confirm
-                Telegram delivery without waiting for its schedule.
+                The scheduler runs inside the app process. Trigger any job now to confirm
+                Telegram delivery without waiting for its schedule. The AI report uses the
+                same assistant as /assistant, so it needs a working AI provider key.
             </p>
 
             <div className="flex flex-wrap gap-3">
@@ -40,6 +41,15 @@ export default function NotificationActions() {
                 >
                     <Send className="mr-2 h-4 w-4" />
                     {pending ? 'Working…' : 'Send daily digest now'}
+                </Button>
+                <Button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => run('AI report', sendAssistantReportNow)}
+                    className="h-9 bg-teal-600 px-3 text-white hover:bg-teal-500"
+                >
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    {pending ? 'Working…' : 'Send AI report now'}
                 </Button>
                 <Button
                     type="button"

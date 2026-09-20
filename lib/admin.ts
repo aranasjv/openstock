@@ -43,6 +43,35 @@ async function getEarliestUserEmail(): Promise<string | null> {
     }
 }
 
+/**
+ * The admin user's id, for jobs that act on their behalf outside a request.
+ *
+ * The daily digest and the AI report both cover "the owner's" holdings, and neither runs
+ * with a session — so they need the same identity the settings page is gated on, resolved
+ * the same way (ADMIN_EMAILS, else the earliest registered user).
+ */
+export async function getAdminUserId(): Promise<string | null> {
+    try {
+        const mongoose = await connectToDatabase();
+        const db = mongoose.connection.db;
+        if (!db) return null;
+
+        const earliest = await db
+            .collection('user')
+            .find({}, { projection: { id: 1, _id: 1, createdAt: 1 } })
+            .sort({ createdAt: 1 })
+            .limit(1)
+            .next();
+
+        const id = earliest?.id;
+        if (typeof id === 'string' && id) return id;
+        return earliest?._id ? String(earliest._id) : null;
+    } catch (error) {
+        console.error('Admin check: could not resolve the admin user id:', error);
+        return null;
+    }
+}
+
 export async function isCurrentUserAdmin(): Promise<boolean> {
     const auth = await getAuth();
     const session = await auth.api.getSession({ headers: await headers() });

@@ -75,7 +75,17 @@ export function buildDigestMessages(input: DigestInput): { stocks: string; crypt
         '',
     ];
 
-    const stocks = [...header, ...renderPicks('Stocks', input.stockPicks, currency), '', DISCLAIMER].join('\n');
+    // Escaped like every other interpolated value — commentary is AI-written prose and
+    // routinely contains "&" or "<".
+    const commentaryLines = input.commentary ? [escapeTelegramHtml(input.commentary), ''] : [];
+
+    const stocks = [
+        ...header,
+        ...renderPicks('Stocks', input.stockPicks, currency),
+        '',
+        ...commentaryLines,
+        DISCLAIMER,
+    ].join('\n');
 
     const holdingsLines: string[] = [];
     if (input.holdings.length > 0) {
@@ -94,8 +104,6 @@ export function buildDigestMessages(input: DigestInput): { stocks: string; crypt
     } else {
         holdingsLines.push('No holdings tracked yet.', '');
     }
-
-    const commentaryLines = input.commentary ? [input.commentary, ''] : [];
 
     const crypto = [
         ...header,

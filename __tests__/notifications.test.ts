@@ -82,11 +82,17 @@ describe('buildDigestMessages', () => {
     expect(crypto).toContain('n/a');
   });
 
-  it('includes optional commentary when provided', () => {
+  // Regression: commentary used to be appended to the crypto message only, so a caller
+  // passing it saw it silently dropped from the stocks chat.
+  it('includes optional commentary in both messages when provided', () => {
     const withCommentary = buildDigestMessages({ ...baseInput, commentary: 'Breadth is improving.' });
     const without = buildDigestMessages(baseInput);
+
     expect(withCommentary.crypto).toContain('Breadth is improving.');
+    expect(withCommentary.stocks).toContain('Breadth is improving.');
+
     expect(without.crypto).not.toContain('Breadth is improving.');
+    expect(without.stocks).not.toContain('Breadth is improving.');
   });
 });
 

@@ -197,6 +197,14 @@ Normalize **only** in `lib/ai-provider.ts`; nothing above it should know which p
   (`lib/scheduler.ts`); `/api/health` reports them. A restart must not re-send the digest.
 - `recordJobOutcome` logs **both** success and failure. Keeping jobs silent on success is how
   a digest that quietly stopped sending looked identical to one with nothing to send.
+- Three jobs: `alerts` (interval), `digest` (daily, deterministic screen), and `report`
+  (daily, **AI-written**, off unless `REPORT_ENABLED`). The report is `/assistant` run
+  headlessly — `runChatTurn` with a standing prompt — so it inherits the tool surface and the
+  playbooks. Two consequences: it needs a working AI provider key, and its output is
+  `escapeTelegramHtml`-ed before sending, because model prose containing `&` or `<` otherwise
+  makes Telegram reject the whole message.
+- Jobs act as the **admin user** (`getAdminUserId()`), since chat ids are deployment-wide and
+  there is no session. That is what makes "your holdings" resolvable in a scheduled run.
 
 ## Conventions
 

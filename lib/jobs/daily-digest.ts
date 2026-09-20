@@ -1,7 +1,7 @@
 import 'server-only';
 
-import { connectToDatabase } from '@/database/mongoose';
 import { loadConfig } from '@/lib/config';
+import { getAdminUserId } from '@/lib/admin';
 import { runScreener } from '@/lib/actions/screener.actions';
 import { getPortfolioSummary } from '@/lib/actions/holdings.actions';
 import { getTelegramConfig, sendTelegramMessage } from '@/lib/telegram';
@@ -60,11 +60,7 @@ export async function runDailyDigest(): Promise<DigestResult> {
             .map((candidate) => toPick(candidate, true));
 
         // Holdings for the deployment's admin user.
-        const mongoose = await connectToDatabase();
-        const admin = await mongoose.connection.db
-            ?.collection('user')
-            .findOne({}, { projection: { id: 1, _id: 1 }, sort: { createdAt: 1 } });
-        const adminId = (admin?.id as string) || String(admin?._id ?? '');
+        const adminId = await getAdminUserId();
 
         const summary = adminId
             ? await getPortfolioSummary(adminId)

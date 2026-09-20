@@ -210,6 +210,7 @@ export async function recordJobOutcome(
 
 export const JOB_ALERTS = 'alerts';
 export const JOB_DIGEST = 'digest';
+export const JOB_REPORT = 'report';
 
 let running = false;
 
@@ -278,6 +279,41 @@ export async function runDueJobs(now: Date = new Date()): Promise<{ ran: string[
             }
         } catch (error) {
             console.error('Scheduler: digest failed:', error);
+        }
+    }
+
+    // Daily AI report. Off unless switched on: it costs one model call per audience per day,
+    // and it posts to a chat, so it should never start sending because of a default.
+    const reportEnabled = (config.REPORT_ENABLED || 'false') === 'true';
+    if (reportEnabled) {
+        try {
+            const reportHour = await getConfigNumber('REPORT_HOUR', digestHour);
+            const lastReport = await getLastRun(JOB_REPORT);
+            if (isDigestDue({ now, lastRunAt: lastReport, hour: reportHour, timezone })) {
+                await setLastRun(JOB_REPORT, now);
+                const started = Date.now();
+                let outcome = { ok: true, detail: '' };
+                try {
+                    const { runAssistantReport } = await import('@/lib/jobs/assistant-report');
+                    const result = await runAssistantReport();
+                    outcome = {
+                        ok: result.ok,
+                        detail:
+                            `sent stocks=${result.sent.stocks} crypto=${result.sent.crypto}` +
+                            (result.error ? ` (${result.error})` : ''),
+                    };
+                } catch (error) {
+                    console.error('Scheduler: AI report failed:', error);
+                    outcome = {
+                        ok: false,
+                        detail: error instanceof Error ? error.message : 'AI report failed',
+                    };
+                }
+                await recordJobOutcome(JOB_REPORT, { ...outcome, durationMs: Date.now() - started });
+                ran.push(JOB_REPORT);
+            }
+        } catch (error) {
+            console.error('Scheduler: AI report failed:', error);
         }
     }
 
