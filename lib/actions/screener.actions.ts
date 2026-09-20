@@ -13,6 +13,7 @@ import {
 } from '@/lib/strategies';
 import { getCryptoMarkets, getCryptoPriceHistory } from '@/lib/actions/crypto.actions';
 import { buildCandidatePrompt, getTraderFramework } from '@/lib/trading-framework';
+import { getCachedScreener, setCachedScreener } from '@/lib/screener-cache';
 import type { AIProviderName } from '@/lib/ai-provider';
 
 /**
@@ -58,8 +59,12 @@ export interface ScreenerResult {
     unavailableReason?: string;
 }
 
-/** Fetch daily candles from Yahoo's unofficial chart endpoint. */
-async function getStockPriceHistory(symbol: string): Promise<Candle[] | null> {
+/**
+ * Fetch daily candles from Yahoo's unofficial chart endpoint.
+ * Exported so the AI tool layer can compute indicators for a single stock without
+ * re-running the whole screener.
+ */
+export async function getStockPriceHistory(symbol: string): Promise<Candle[] | null> {
     const config = await loadConfig();
     const baseUrl = (config.YAHOO_CHART_BASE_URL || DEFAULT_YAHOO_CHART_BASE).replace(/\/$/, '');
 
@@ -149,12 +154,10 @@ async function getStockName(symbol: string): Promise<string> {
     }
 }
 
-export async function runScreener(
+async function runScreenerUncached(
     assetType: 'stock' | 'crypto',
-    strategyIdInput?: string
+    strategyId: StrategyId
 ): Promise<ScreenerResult> {
-    const strategyId: StrategyId = isStrategyId(strategyIdInput) ? strategyIdInput : DEFAULT_STRATEGY_ID;
-
     const strategies = STRATEGIES.map(({ id, name, summary }) => ({ id, name, summary }));
 
     const universeSize = await getConfigNumber('SCREENER_UNIVERSE_SIZE', 12);
@@ -245,9 +248,38 @@ export async function runScreener(
             candidates.length === 0
                 ? assetType === 'stock'
                     ? 'Stock history is unavailable. The free OHLCV source used here is unofficial and may be blocked or rate limited.'
-                    : 'Crypto history is unavailable right now.'
+                    : 'Crypto history is unavailable right now — the market data provider may be rate limiting requests. This usually clears within a minute.'
                 : undefined,
     };
+}
+
+/**
+ * Run the Must Buy screener, memoised for SCREENER_CACHE_SECONDS.
+ *
+ * Only non-empty results are cached. A fully-degraded scan (every symbol unavailable, which
+ * is what a burst of rate limiting looks like) is deliberately not cached — pinning that
+ * for an hour would leave the dashboard stuck showing nothing long after the provider
+ * recovered.
+ */
+export async function runScreener(
+    assetType: 'stock' | 'crypto',
+    strategyIdInput?: string
+): Promise<ScreenerResult> {
+    const strategyId: StrategyId = isStrategyId(strategyIdInput) ? strategyIdInput : DEFAULT_STRATEGY_ID;
+
+    const cacheSeconds = await getConfigNumber('SCREENER_CACHE_SECONDS', 3600);
+    const cacheKey = `${assetType}:${strategyId}`;
+
+    const cached = getCachedScreener(cacheKey);
+    if (cached) return cached;
+
+    const result = await runScreenerUncached(assetType, strategyId);
+
+    if (result.candidates.length > 0) {
+        setCachedScreener(cacheKey, result, cacheSeconds);
+    }
+
+    return result;
 }
 
 /** Strategy metadata for the dropdown. */

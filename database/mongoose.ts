@@ -1,16 +1,39 @@
 import mongoose from "mongoose";
+import dns from 'dns';
+import { setDefaultAutoSelectFamily } from 'node:net';
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
-// FIX: Set Google DNS and force IPv4 to avoid querySrv ECONNREFUSED
-import dns from 'dns';
+/**
+ * Outbound networking fixes, needed in a container.
+ *
+ * Set Google DNS and force IPv4 to avoid querySrv ECONNREFUSED.
+ *
+ * Also disables Node 20's "Happy Eyeballs" address-family racing (autoSelectFamily): it
+ * resolves every family and races them, and a container with no IPv6 route still receives
+ * AAAA records — connecting to one does not fail fast, it black-holes until the whole request
+ * times out. That is why `fetch` to api.telegram.org timed out (ETIMEDOUT) inside the
+ * container while `wget` to the same URL returned 200; it was misread as a network block on
+ * Telegram, but it was this client-side behaviour.
+ *
+ * This runs here, at the top of the Node-only database module, rather than in
+ * instrumentation.ts: Next.js compiles instrumentation for the edge runtime as well (the
+ * middleware), where node:net/node:dns do not exist, and a static import there crashed every
+ * middleware-matched route.
+ */
 try {
     // This is often more effective than setServers for Node 17+
     if (dns.setDefaultResultOrder) {
         dns.setDefaultResultOrder('ipv4first');
     }
     dns.setServers(['8.8.8.8']);
-    console.log('MongoDB: Custom DNS settings applied');
+
+    // Prefer A records; the app already assumes IPv4 egress.
+    if (typeof setDefaultAutoSelectFamily === 'function') {
+        setDefaultAutoSelectFamily(false);
+    }
+
+    console.log('🌐 Outbound networking: IPv4 preferred, address-family racing disabled');
 } catch (e) {
     console.error('Failed to set custom DNS:', e);
 }

@@ -38,37 +38,103 @@ type RawCoinMarket = {
     total_supply?: number | null;
 };
 
+/**
+ * Serialised request gate.
+ *
+ * The free CoinGecko tier allows roughly 10-30 requests a minute, and the screener asks for
+ * one coin's history at a time. Firing those in parallel produces 429s — observed live, with
+ * about a third of a cold scan failing. Spacing them costs latency on a cold cache and
+ * nothing thereafter, which is the right trade.
+ *
+ * Requests are chained rather than merely delayed, so concurrency is one by construction
+ * and there is no window where two calls slip through together.
+ */
+const MARKET_CHART_SPACING_MS = 2_000;
+const DEFAULT_SPACING_MS = 250;
+
+let requestChain: Promise<void> = Promise.resolve();
+let lastRequestAt = 0;
+
+function spacingFor(path: string): number {
+    return path.includes('/market_chart') ? MARKET_CHART_SPACING_MS : DEFAULT_SPACING_MS;
+}
+
+function scheduleRequest(path: string): Promise<void> {
+    const spacing = spacingFor(path);
+
+    const scheduled = requestChain.then(async () => {
+        const elapsed = Date.now() - lastRequestAt;
+        if (elapsed < spacing) {
+            await new Promise((resolve) => setTimeout(resolve, spacing - elapsed));
+        }
+        lastRequestAt = Date.now();
+    });
+
+    // Keep the chain alive even if a scheduled wait rejects, or every later request would
+    // inherit the rejection and the gate would deadlock.
+    requestChain = scheduled.catch(() => undefined);
+    return scheduled;
+}
+
+/** Retry-After is in seconds; clamp it so a hostile value cannot stall the scheduler. */
+function retryDelayMs(res: Response, attempt: number): number {
+    const header = Number(res.headers.get('retry-after'));
+    if (Number.isFinite(header) && header > 0) {
+        return Math.min(header * 1000, 15_000);
+    }
+    return Math.min(1_000 * 2 ** attempt, 8_000);
+}
+
 async function fetchCoinGecko<T>(path: string, revalidateSeconds?: number): Promise<T | null> {
     const config = await loadConfig();
     const baseUrl = (config.COINGECKO_API_BASE_URL || DEFAULT_COINGECKO_BASE_URL).replace(/\/$/, '');
     const apiKey = config.COINGECKO_API_KEY || '';
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const MAX_ATTEMPTS = 3;
 
-    const options: RequestInit & { next?: { revalidate?: number } } = revalidateSeconds
-        ? { cache: 'force-cache', next: { revalidate: revalidateSeconds }, signal: controller.signal }
-        : { cache: 'no-store', signal: controller.signal };
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        await scheduleRequest(path);
 
-    if (apiKey) {
-        options.headers = { 'x-cg-demo-api-key': apiKey };
-    }
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-    try {
-        const res = await fetch(`${baseUrl}${path}`, options);
+        const options: RequestInit & { next?: { revalidate?: number } } = revalidateSeconds
+            ? { cache: 'force-cache', next: { revalidate: revalidateSeconds }, signal: controller.signal }
+            : { cache: 'no-store', signal: controller.signal };
 
-        if (!res.ok) {
-            console.error(`CoinGecko ${res.status} for ${path}`);
-            return null;
+        if (apiKey) {
+            options.headers = { 'x-cg-demo-api-key': apiKey };
         }
 
-        return (await res.json()) as T;
-    } catch (error) {
-        console.error(`CoinGecko request failed for ${path}:`, error);
-        return null;
-    } finally {
-        clearTimeout(timeout);
+        try {
+            const res = await fetch(`${baseUrl}${path}`, options);
+
+            if (res.status === 429) {
+                const delay = retryDelayMs(res, attempt);
+                console.warn(
+                    `CoinGecko rate limited (429) for ${path}; retrying in ${delay}ms` +
+                        (attempt === MAX_ATTEMPTS - 1 ? ' — giving up' : '')
+                );
+                if (attempt === MAX_ATTEMPTS - 1) return null;
+                await new Promise((resolve) => setTimeout(resolve, delay));
+                continue;
+            }
+
+            if (!res.ok) {
+                console.error(`CoinGecko ${res.status} for ${path}`);
+                return null;
+            }
+
+            return (await res.json()) as T;
+        } catch (error) {
+            console.error(`CoinGecko request failed for ${path}:`, error);
+            return null;
+        } finally {
+            clearTimeout(timeout);
+        }
     }
+
+    return null;
 }
 
 function mapMarket(coin: RawCoinMarket) {
@@ -284,6 +350,10 @@ export const searchCrypto = cache(async (query?: string): Promise<CryptoCoinWith
  * CoinGecko's market_chart returns close prices and volumes but not OHLC, so
  * open/high/low are filled from the close. Every indicator the screener uses is derived
  * from closes and volumes, so nothing is lost.
+ *
+ * Cached for 6 hours. The indicators are computed from DAILY bars, so an hourly refetch
+ * bought nothing and was the direct cause of the rate limiting: a cold scan of twelve coins
+ * meant twelve upstream calls. With this cache a repeat scan costs zero requests.
  */
 export async function getCryptoPriceHistory(coinId: string): Promise<Candle[] | null> {
     if (!coinId) return null;
@@ -291,7 +361,7 @@ export async function getCryptoPriceHistory(coinId: string): Promise<Candle[] | 
     const raw = await fetchCoinGecko<{
         prices?: [number, number][];
         total_volumes?: [number, number][];
-    }>(`/coins/${encodeURIComponent(coinId.toLowerCase())}/market_chart?vs_currency=usd&days=200&interval=daily`, 3600);
+    }>(`/coins/${encodeURIComponent(coinId.toLowerCase())}/market_chart?vs_currency=usd&days=200&interval=daily`, 21_600);
 
     if (!raw?.prices || !Array.isArray(raw.prices)) return null;
 

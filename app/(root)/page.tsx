@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { Sparkles } from "lucide-react";
 import TradingViewWidget from "@/components/TradingViewWidget";
 import MustBuySection from "@/components/screener/MustBuySection";
 import {
@@ -29,6 +31,26 @@ const Home = async ({ searchParams }: HomeProps) => {
         // No outer padding: the panels sit flush against the sidebar and viewport edges so the
         // dashboard uses the full area. A small gap still separates panels from each other.
         <div className="flex h-full flex-col gap-2">
+            {/* Same compact header pattern as the crypto dashboard, so the Assistant is
+                reachable from both markets without adding any persistent chrome. */}
+            <header className="flex shrink-0 items-center justify-between gap-2 px-2 pt-2">
+                <div className="flex items-baseline gap-2">
+                    <h1 className="bg-clip-text text-lg font-bold text-transparent bg-gradient-to-r from-white to-gray-500">
+                        Stocks
+                    </h1>
+                    <span className="text-[11px] text-gray-600">
+                        Live indices, heatmap and the Must Buy screen
+                    </span>
+                </div>
+                <Link
+                    href="/assistant"
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-teal-900/50 bg-teal-950/30 px-2.5 py-1.5 text-[11px] text-teal-300 transition-colors hover:bg-teal-900/30"
+                >
+                    <Sparkles className="h-3 w-3" />
+                    Ask AI
+                </Link>
+            </header>
+
             <section className="grid shrink-0 gap-2 xl:grid-cols-3">
                 <TradingViewWidget
                     title="Market Overview"

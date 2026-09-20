@@ -29,6 +29,18 @@ services:
       # Gates the /settings page. When unset, the earliest-registered user is the admin.
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
     restart: unless-stopped
+    # Probes the app's own health endpoint, which also reports whether it can reach Mongo
+    # and whether the scheduled jobs last succeeded.
+    #
+    # 127.0.0.1, not localhost: inside the container localhost can resolve to ::1, and the
+    # server binds IPv4 — so the probe gets "connection refused" while the app is perfectly
+    # healthy. Same address-family trap documented in instrumentation.ts.
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     depends_on:
       mongodb:
         condition: service_healthy

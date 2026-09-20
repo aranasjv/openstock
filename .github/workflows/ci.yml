@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A new push to the same branch makes the previous run obsolete; cancel it rather than
+# burning minutes on a commit nobody is waiting for.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # The build must succeed with no database and no real secrets. These placeholders are
+    # enough because config is read at request time, not at module load: loadConfig()
+    # degrades to environment values when MongoDB is unreachable, and every page that
+    # touches the database is dynamic (forced by searchParams/headers/cookies), so nothing
+    # is prerendered against a live connection.
+    env:
+      MONGODB_URI: mongodb://127.0.0.1:27017/openstock-ci
+      BETTER_AUTH_SECRET: ci-placeholder-secret-not-used-outside-ci
+      BETTER_AUTH_URL: http://localhost:3000
+      NEXT_PUBLIC_FINNHUB_API_KEY: ci-placeholder
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # NOTE: `npm run lint` is intentionally not a gate. The repository has pre-existing
+      # lint errors in legacy files (scripts/*.js, components/DonatePopup.tsx,
+      # lib/kit.ts, ...), so gating on it would fail every run for reasons unrelated to the
+      # change under test. Fix that debt first, then add a lint step here.
+      - name: Unit tests
+        run: npm test
+
+      - name: Production build (no database)
+        run: npm run build

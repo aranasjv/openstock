@@ -136,6 +136,76 @@ export async function setLastRun(job: string, at: Date = new Date()): Promise<vo
     }
 }
 
+export interface JobState {
+    lastRunAt: Date | null;
+    lastStatus: 'ok' | 'error' | null;
+    lastError: string | null;
+    lastDurationMs: number | null;
+}
+
+const EMPTY_JOB_STATE: JobState = {
+    lastRunAt: null,
+    lastStatus: null,
+    lastError: null,
+    lastDurationMs: null,
+};
+
+/** Read a job's persisted state. Used by the health endpoint to expose job health. */
+export async function getJobState(job: string): Promise<JobState> {
+    try {
+        const mongoose = await connectToDatabase();
+        const doc = await mongoose.connection.db
+            ?.collection(JOB_STATE_COLLECTION)
+            .findOne({ key: job });
+        if (!doc) return EMPTY_JOB_STATE;
+
+        return {
+            lastRunAt: doc.lastRunAt ? new Date(doc.lastRunAt as string | Date) : null,
+            lastStatus: doc.lastStatus === 'ok' || doc.lastStatus === 'error' ? doc.lastStatus : null,
+            lastError: typeof doc.lastError === 'string' && doc.lastError ? doc.lastError : null,
+            lastDurationMs: typeof doc.lastDurationMs === 'number' ? doc.lastDurationMs : null,
+        };
+    } catch (error) {
+        console.error(`Scheduler: could not read state for ${job}:`, error);
+        return EMPTY_JOB_STATE;
+    }
+}
+
+/**
+ * Record and log how a job finished.
+ *
+ * The jobs used to be silent on success and log only on failure, so a digest that quietly
+ * stopped sending looked identical to one with nothing to send. Logging both outcomes makes
+ * "did it run, and did it work" answerable from the logs alone.
+ */
+export async function recordJobOutcome(
+    job: string,
+    outcome: { ok: boolean; detail?: string; durationMs: number }
+): Promise<void> {
+    console.log(
+        `${outcome.ok ? '✅' : '❌'} Job "${job}" ${outcome.ok ? 'succeeded' : 'failed'} in ` +
+            `${outcome.durationMs}ms${outcome.detail ? ` — ${outcome.detail}` : ''}`
+    );
+
+    try {
+        const mongoose = await connectToDatabase();
+        await mongoose.connection.db?.collection(JOB_STATE_COLLECTION).updateOne(
+            { key: job },
+            {
+                $set: {
+                    lastStatus: outcome.ok ? 'ok' : 'error',
+                    lastError: outcome.ok ? '' : outcome.detail ?? 'Job failed',
+                    lastDurationMs: outcome.durationMs,
+                    lastFinishedAt: new Date(),
+                },
+            },
+            { upsert: true }
+        );
+    } catch (error) {
+        console.error(`Scheduler: could not record outcome for ${job}:`, error);
+    }
+}
+
 // ── Runner ─────────────────────────────────────────────────────────
 
 export const JOB_ALERTS = 'alerts';
@@ -161,8 +231,20 @@ export async function runDueJobs(now: Date = new Date()): Promise<{ ran: string[
         const lastAlerts = await getLastRun(JOB_ALERTS);
         if (isJobDue({ now, lastRunAt: lastAlerts, everyMinutes: alertMinutes })) {
             await setLastRun(JOB_ALERTS, now);
-            const { runAlertCheck } = await import('@/lib/jobs/alert-check');
-            await runAlertCheck();
+            const started = Date.now();
+            let outcome = { ok: true, detail: '' };
+            try {
+                const { runAlertCheck } = await import('@/lib/jobs/alert-check');
+                const result = await runAlertCheck();
+                outcome = { ok: true, detail: `${result.processed} active, ${result.triggered} triggered` };
+            } catch (error) {
+                console.error('Scheduler: alert check failed:', error);
+                outcome = {
+                    ok: false,
+                    detail: error instanceof Error ? error.message : 'Alert check failed',
+                };
+            }
+            await recordJobOutcome(JOB_ALERTS, { ...outcome, durationMs: Date.now() - started });
             ran.push(JOB_ALERTS);
         }
     } catch (error) {
@@ -175,8 +257,23 @@ export async function runDueJobs(now: Date = new Date()): Promise<{ ran: string[
             const lastDigest = await getLastRun(JOB_DIGEST);
             if (isDigestDue({ now, lastRunAt: lastDigest, hour: digestHour, timezone })) {
                 await setLastRun(JOB_DIGEST, now);
-                const { runDailyDigest } = await import('@/lib/jobs/daily-digest');
-                await runDailyDigest();
+                const started = Date.now();
+                let outcome = { ok: true, detail: '' };
+                try {
+                    const { runDailyDigest } = await import('@/lib/jobs/daily-digest');
+                    const result = await runDailyDigest();
+                    outcome = {
+                        ok: result.ok,
+                        detail: `picks stocks=${result.pickCounts.stocks} crypto=${result.pickCounts.crypto}, sent stocks=${result.sent.stocks} crypto=${result.sent.crypto}`,
+                    };
+                } catch (error) {
+                    console.error('Scheduler: digest failed:', error);
+                    outcome = {
+                        ok: false,
+                        detail: error instanceof Error ? error.message : 'Digest failed',
+                    };
+                }
+                await recordJobOutcome(JOB_DIGEST, { ...outcome, durationMs: Date.now() - started });
                 ran.push(JOB_DIGEST);
             }
         } catch (error) {

@@ -1,0 +1,426 @@
+import 'server-only';
+
+import type { AIToolSpec } from '@/lib/ai-provider';
+
+/**
+ * Tools the assistant can call.
+ *
+ * Deliberately read-only. A model that can silently create alerts, move money or edit
+ * holdings is a far larger risk surface than this feature needs; everything here answers a
+ * question. Write actions are left as future work.
+ *
+ * Every tool receives the calling user's id, and the personal ones (holdings, watchlist)
+ * filter by it, so a conversation can never read another user's positions.
+ */
+
+export interface AIToolContext {
+    userId: string;
+}
+
+export interface AITool {
+    spec: AIToolSpec;
+    /** Returns a JSON-serialisable result, or throws with a message the model can read. */
+    execute: (args: Record<string, unknown>, ctx: AIToolContext) => Promise<unknown>;
+}
+
+function str(args: Record<string, unknown>, key: string): string {
+    const value = args[key];
+    if (typeof value !== 'string' || !value.trim()) {
+        throw new Error(`"${key}" is required and must be a non-empty string.`);
+    }
+    return value.trim();
+}
+
+function optionalAssetType(args: Record<string, unknown>): 'stock' | 'crypto' {
+    const value = args.assetType;
+    return value === 'crypto' ? 'crypto' : 'stock';
+}
+
+/**
+ * Cap how much of a list is returned. Tool output is fed straight back into the model's
+ * context, so an unbounded 50-coin payload on every call is wasteful and can crowd out the
+ * conversation.
+ */
+function limit<T>(items: T[], max: number): T[] {
+    return items.slice(0, max);
+}
+
+export const AI_TOOLS: AITool[] = [
+    {
+        spec: {
+            name: 'search_assets',
+            description:
+                'Resolve a company name, ticker or coin name to the exact symbol or CoinGecko id used by the other tools. Call this first when you are not certain of the identifier.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    query: { type: 'string', description: 'e.g. "apple", "AAPL", "bitcoin", "solana"' },
+                    assetType: { type: 'string', enum: ['stock', 'crypto'], description: 'Restrict to one market.' },
+                },
+                required: ['query'],
+            },
+        },
+        execute: async (args) => {
+            const query = str(args, 'query');
+            const assetType = optionalAssetType(args);
+
+            // Imported lazily: these modules read runtime config and open network calls,
+            // which should not happen merely because the tool registry was imported.
+            if (assetType === 'crypto') {
+                const { searchCrypto } = await import('@/lib/actions/crypto.actions');
+                const coins = await searchCrypto(query);
+                return {
+                    assetType: 'crypto',
+                    results: limit(
+                        coins.map((coin) => ({ id: coin.id, symbol: coin.symbol, name: coin.name })),
+                        10
+                    ),
+                };
+            }
+
+            const { searchStocks } = await import('@/lib/actions/finnhub.actions');
+            const stocks = await searchStocks(query);
+            return {
+                assetType: 'stock',
+                results: limit(
+                    stocks.map((stock) => ({ symbol: stock.symbol, name: stock.name, exchange: stock.exchange })),
+                    10
+                ),
+            };
+        },
+    },
+
+    {
+        spec: {
+            name: 'get_stock_quote',
+            description: 'Current price and daily change for a stock ticker. Use the exact ticker, e.g. AAPL.',
+            parameters: {
+                type: 'object',
+                properties: { symbol: { type: 'string', description: 'Stock ticker, e.g. AAPL' } },
+                required: ['symbol'],
+            },
+        },
+        execute: async (args) => {
+            const symbol = str(args, 'symbol').toUpperCase();
+            const { getQuote, getCompanyProfile } = await import('@/lib/actions/finnhub.actions');
+            const [quote, profile] = await Promise.all([getQuote(symbol), getCompanyProfile(symbol)]);
+
+            if (!quote) {
+                throw new Error(
+                    `No quote returned for ${symbol}. Either the ticker is wrong or the market data provider is unavailable.`
+                );
+            }
+
+            return {
+                symbol,
+                name: profile?.name ?? symbol,
+                price: quote.c ?? null,
+                change: quote.d ?? null,
+                changePercent: quote.dp ?? null,
+                currency: profile?.currency ?? 'USD',
+                exchange: profile?.exchange ?? null,
+                note: 'Price is from the configured market data provider and may be delayed on a free plan.',
+            };
+        },
+    },
+
+    {
+        spec: {
+            name: 'get_crypto_markets',
+            description: 'Top cryptocurrencies by market cap with price, 24h change, market cap and volume.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    limit: { type: 'number', description: 'How many coins to return, 1-25. Defaults to 10.' },
+                },
+            },
+        },
+        execute: async (args) => {
+            const requested = Number(args.limit);
+            const count = Number.isFinite(requested) ? Math.max(1, Math.min(25, Math.trunc(requested))) : 10;
+
+            const { getCryptoMarkets } = await import('@/lib/actions/crypto.actions');
+            const markets = await getCryptoMarkets(Math.max(count, 25));
+
+            if (markets.length === 0) {
+                throw new Error('CoinGecko returned no market data. It may be rate limited — try again shortly.');
+            }
+
+            return {
+                count: Math.min(count, markets.length),
+                coins: limit(
+                    markets.map((coin) => ({
+                        id: coin.id,
+                        symbol: coin.symbol,
+                        name: coin.name,
+                        priceUsd: coin.currentPrice,
+                        changePercent24h: coin.changePercent24h,
+                        marketCapUsd: coin.marketCap,
+                        marketCapRank: coin.marketCapRank ?? null,
+                    })),
+                    count
+                ),
+            };
+        },
+    },
+
+    {
+        spec: {
+            name: 'get_crypto_coin',
+            description:
+                'Detail for one coin by its CoinGecko id (e.g. "bitcoin"): description, supply, all-time high and low.',
+            parameters: {
+                type: 'object',
+                properties: { id: { type: 'string', description: 'CoinGecko id, e.g. "bitcoin"' } },
+                required: ['id'],
+            },
+        },
+        execute: async (args) => {
+            const id = str(args, 'id').toLowerCase();
+            const { getCryptoCoinDetail } = await import('@/lib/actions/crypto.actions');
+            const coin = await getCryptoCoinDetail(id);
+
+            if (!coin) {
+                throw new Error(
+                    `No coin found with id "${id}". Verify the id with search_assets — it is the CoinGecko id, not the ticker.`
+                );
+            }
+
+            return {
+                id: coin.id,
+                name: coin.name,
+                ticker: coin.symbol,
+                priceUsd: coin.currentPrice,
+                changePercent24h: coin.changePercent24h,
+                marketCapUsd: coin.marketCap,
+                marketCapRank: coin.marketCapRank ?? null,
+                volume24hUsd: coin.totalVolume,
+                allTimeHighUsd: coin.ath ?? null,
+                allTimeLowUsd: coin.atl ?? null,
+                circulatingSupply: coin.circulatingSupply ?? null,
+                totalSupply: coin.totalSupply ?? null,
+                description: coin.description ? coin.description.replace(/<[^>]*>/g, '').slice(0, 600) : null,
+            };
+        },
+    },
+
+    {
+        spec: {
+            name: 'get_indicators',
+            description:
+                'Computed technical indicators for a stock or coin — SMA50, SMA200, RSI(14), MACD, 20-bar high/low, volatility and max drawdown. This is the right tool for "is X overbought" or "where is the trend".',
+            parameters: {
+                type: 'object',
+                properties: {
+                    symbol: { type: 'string', description: 'Ticker for a stock, CoinGecko id for a coin.' },
+                    assetType: { type: 'string', enum: ['stock', 'crypto'] },
+                },
+                required: ['symbol', 'assetType'],
+            },
+        },
+        execute: async (args) => {
+            const symbol = str(args, 'symbol');
+            const assetType = optionalAssetType(args);
+
+            const { computeIndicators } = await import('@/lib/indicators');
+            const { getCryptoPriceHistory } = await import('@/lib/actions/crypto.actions');
+            const { getStockPriceHistory } = await import('@/lib/actions/screener.actions');
+
+            const candles =
+                assetType === 'crypto'
+                    ? await getCryptoPriceHistory(symbol)
+                    : await getStockPriceHistory(symbol);
+
+            if (!candles) {
+                throw new Error(
+                    `No price history for ${symbol} (${assetType}). For stocks the free source is unofficial and may be unavailable; for coins check the id.`
+                );
+            }
+
+            const bundle = computeIndicators(candles);
+            if (!bundle) {
+                throw new Error(`Not enough price history for ${symbol} to compute indicators.`);
+            }
+
+            return {
+                symbol,
+                assetType,
+                bars: bundle.bars,
+                price: bundle.price,
+                sma50: bundle.sma50,
+                sma200: bundle.sma200,
+                sma200TwentyBarsAgo: bundle.sma200Prior,
+                rsi14: bundle.rsi14,
+                macd: bundle.macd,
+                high20: bundle.high20,
+                low20: bundle.low20,
+                change5dPercent: bundle.change5d,
+                change30dPercent: bundle.change30d,
+                maxDrawdownPercent: bundle.maxDrawdown,
+                volatilityPercent: bundle.volatility,
+                note: 'Computed from daily bars; any null value means insufficient history for that indicator.',
+            };
+        },
+    },
+
+    {
+        spec: {
+            name: 'run_screener',
+            description:
+                'Run the Must Buy screener for one market and return the ranked candidates with their score and which conditions passed. This is deterministic — you are reporting its output, not producing your own ranking.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    assetType: { type: 'string', enum: ['stock', 'crypto'] },
+                    strategy: {
+                        type: 'string',
+                        enum: ['trend-following', 'momentum', 'oversold-pullback', 'breakout', 'mean-reversion'],
+                    },
+                },
+                required: ['assetType'],
+            },
+        },
+        execute: async (args) => {
+            const assetType = optionalAssetType(args);
+            const strategy = typeof args.strategy === 'string' ? args.strategy : undefined;
+
+            const { runScreener } = await import('@/lib/actions/screener.actions');
+            const result = await runScreener(assetType, strategy);
+            const matched = result.candidates.filter((candidate) => candidate.matched > 0);
+
+            return {
+                assetType,
+                strategy: result.strategyId,
+                scanned: result.scanned,
+                unavailable: result.unavailable,
+                // Only assets that matched at least one condition; a 0/3 row is noise.
+                candidates: limit(
+                    matched.map((candidate) => ({
+                        symbol: candidate.symbol,
+                        name: candidate.name,
+                        price: candidate.price,
+                        score: candidate.score,
+                        tier: candidate.tier,
+                        conditionsMet: `${candidate.matched}/${candidate.total}`,
+                        passed: candidate.passed.map((c) => `${c.label} (${c.detail})`),
+                        failed: candidate.failed.map((c) => `${c.label} (${c.detail})`),
+                    })),
+                    8
+                ),
+                degradedNotice: result.unavailableReason ?? null,
+                disclaimer:
+                    'Rule-based technical screen, not investment advice. A score is the share of the strategy conditions met, not a forecast.',
+            };
+        },
+    },
+
+    {
+        spec: {
+            name: 'get_market_news',
+            description: 'Recent market headlines for stocks or crypto.',
+            parameters: {
+                type: 'object',
+                properties: { assetType: { type: 'string', enum: ['stock', 'crypto'] } },
+                required: ['assetType'],
+            },
+        },
+        execute: async (args) => {
+            const assetType = optionalAssetType(args);
+
+            const articles =
+                assetType === 'crypto'
+                    ? await (await import('@/lib/actions/crypto.actions')).getCryptoNews()
+                    : await (await import('@/lib/actions/finnhub.actions')).getNews();
+
+            return {
+                assetType,
+                count: articles.length,
+                headlines: limit(
+                    articles.map((article) => ({
+                        headline: article.headline,
+                        source: article.source,
+                        url: article.url,
+                    })),
+                    8
+                ),
+            };
+        },
+    },
+
+    {
+        spec: {
+            name: 'get_my_holdings',
+            description:
+                "The user's own portfolio positions with quantity, average cost, current value and profit/loss. Use this for any question about how their positions are doing.",
+            parameters: { type: 'object', properties: {} },
+        },
+        execute: async (_args, ctx) => {
+            const { getPortfolioSummary } = await import('@/lib/actions/holdings.actions');
+            const summary = await getPortfolioSummary(ctx.userId);
+
+            if (summary.holdings.length === 0) {
+                return { holdings: [], note: 'The user has not recorded any holdings yet.' };
+            }
+
+            return {
+                totalValue: summary.totalValue,
+                totalCost: summary.totalCost,
+                totalPnl: summary.totalPnl,
+                totalPnlPercent: summary.totalPnlPercent,
+                holdings: limit(
+                    summary.holdings.map((holding) => ({
+                        symbol: holding.symbol,
+                        assetType: holding.assetType,
+                        quantity: holding.quantity,
+                        averageCost: holding.averageCost,
+                        price: holding.price,
+                        marketValue: holding.marketValue,
+                        pnl: holding.pnl,
+                        pnlPercent: holding.pnlPercent,
+                    })),
+                    25
+                ),
+                unpricedSymbols: summary.unpricedSymbols,
+                note: 'A null price means no quote was available; totals exclude those positions rather than counting them as zero.',
+            };
+        },
+    },
+
+    {
+        spec: {
+            name: 'get_my_watchlist',
+            description: "The user's watchlist — the assets they are tracking.",
+            parameters: {
+                type: 'object',
+                properties: { assetType: { type: 'string', enum: ['stock', 'crypto'] } },
+            },
+        },
+        execute: async (args, ctx) => {
+            const assetType = args.assetType === 'crypto' ? 'crypto' : args.assetType === 'stock' ? 'stock' : undefined;
+            const { getUserWatchlist } = await import('@/lib/actions/watchlist.actions');
+            const items = await getUserWatchlist(ctx.userId, assetType);
+
+            return {
+                count: items.length,
+                items: limit(
+                    items.map((item: { symbol: string; company: string; assetType?: string }) => ({
+                        symbol: item.symbol,
+                        name: item.company,
+                        assetType: item.assetType ?? 'stock',
+                    })),
+                    50
+                ),
+            };
+        },
+    },
+];
+
+const TOOL_BY_NAME = new Map(AI_TOOLS.map((tool) => [tool.spec.name, tool]));
+
+export function getToolSpecs(): AIToolSpec[] {
+    return AI_TOOLS.map((tool) => tool.spec);
+}
+
+export function getTool(name: string): AITool | undefined {
+    return TOOL_BY_NAME.get(name);
+}

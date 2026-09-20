@@ -10,6 +10,7 @@ import {
 } from "@/lib/constants";
 import { getCryptoMarkets, searchCrypto } from "@/lib/actions/crypto.actions";
 import MustBuySection from "@/components/screener/MustBuySection";
+import { Sparkles } from "lucide-react";
 
 interface CryptoDashboardProps {
     searchParams: Promise<{ strategy?: string }>;
@@ -51,6 +52,13 @@ export default async function CryptoDashboard({ searchParams }: CryptoDashboardP
                     </span>
                 </div>
                 <div className="flex items-center gap-2">
+                    <Link
+                        href="/assistant"
+                        className="inline-flex items-center gap-1.5 rounded-md border border-teal-900/50 bg-teal-950/30 px-2.5 py-1.5 text-[11px] text-teal-300 transition-colors hover:bg-teal-900/30"
+                    >
+                        <Sparkles className="h-3 w-3" />
+                        Ask AI
+                    </Link>
                     <Link
                         href="/watchlist?tab=crypto"
                         className="rounded-md border border-gray-800 px-2.5 py-1.5 text-[11px] text-gray-300 transition-colors hover:bg-white/5"
