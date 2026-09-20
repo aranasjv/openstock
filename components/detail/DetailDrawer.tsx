@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { X, ExternalLink, Loader2 } from 'lucide-react';
@@ -66,13 +66,64 @@ export default function DetailDrawer({
         axis: 'x',
     });
 
+    const panelRef = useRef<HTMLElement | null>(null);
+
+    /*
+     * Escape closes; focus is trapped inside while open and restored on close.
+     *
+     * Without this the drawer was a dialog in name only. Opening it left focus on the row
+     * behind, so Tab walked the page *underneath* the panel and a screen reader kept reading
+     * the table it was covering. Closing it dropped focus to the top of the document, so a
+     * keyboard user lost their place in a list they had scrolled to reach.
+     */
     useEffect(() => {
         if (!open) return;
+
+        const previouslyFocused = document.activeElement as HTMLElement | null;
+
+        const focusable = () =>
+            Array.from(
+                panelRef.current?.querySelectorAll<HTMLElement>(
+                    'a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])'
+                ) ?? []
+            ).filter((element) => element.offsetParent !== null);
+
         const onKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') onClose();
+            if (e.key === 'Escape') {
+                onClose();
+                return;
+            }
+            if (e.key !== 'Tab') return;
+
+            const items = focusable();
+            if (items.length === 0) return;
+
+            const first = items[0];
+            const last = items[items.length - 1];
+            const active = document.activeElement;
+            const inside = panelRef.current?.contains(active);
+
+            if (e.shiftKey && (!inside || active === first)) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && active === last) {
+                e.preventDefault();
+                first.focus();
+            }
         };
+
         window.addEventListener('keydown', onKeyDown);
-        return () => window.removeEventListener('keydown', onKeyDown);
+
+        // Focused on the next frame, once the panel has been laid out.
+        const raf = window.requestAnimationFrame(() => {
+            (focusable()[0] ?? panelRef.current)?.focus();
+        });
+
+        return () => {
+            window.removeEventListener('keydown', onKeyDown);
+            window.cancelAnimationFrame(raf);
+            previouslyFocused?.focus?.();
+        };
     }, [open, onClose]);
 
     if (!open) return null;
@@ -89,10 +140,13 @@ export default function DetailDrawer({
             />
 
             <aside
+                ref={panelRef}
                 role="dialog"
+                aria-modal="true"
+                tabIndex={-1}
                 aria-label={label}
                 style={{ width }}
-                className="fixed top-0 right-0 z-50 flex h-screen max-w-[95vw] flex-col border-l border-gray-800 bg-black shadow-2xl"
+                className="fixed top-0 right-0 z-50 flex h-screen max-w-[95vw] flex-col border-l border-gray-800 bg-black shadow-2xl outline-none"
             >
                 <div
                     onPointerDown={startResize}
@@ -161,7 +215,9 @@ export default function DetailDrawer({
                     </div>
                 </div>
 
-                <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                {/* `overscroll-contain` so reaching the end of the panel does not scroll the
+                    page behind it. */}
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
                     {loading ? (
                         <div className="flex h-40 items-center justify-center">
                             <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
