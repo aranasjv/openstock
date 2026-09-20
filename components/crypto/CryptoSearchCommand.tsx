@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react"
 import { CommandDialog, CommandEmpty, CommandInput, CommandList } from "@/components/ui/command"
-import { Button } from "@/components/ui/button";
 import { Coins, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { searchCrypto } from "@/lib/actions/crypto.actions";
@@ -83,9 +82,12 @@ export default function CryptoSearchCommand({
                     {label}
                 </button>
             ) : (
-                <Button onClick={() => setOpen(true)} className={className ?? "search-btn"}>
+                // Plain button for the same reason as the stock search: the shadcn <Button>'s
+                // default variant paints `bg-primary`, near-white in dark mode, which beats a
+                // className that only sets a border and text colour.
+                <button type="button" onClick={() => setOpen(true)} className={className ?? "search-btn"}>
                     {label}
-                </Button>
+                </button>
             )}
             <CommandDialog open={open} onOpenChange={setOpen} className="search-dialog">
                 <div className="search-field">

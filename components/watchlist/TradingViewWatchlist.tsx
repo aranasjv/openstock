@@ -49,7 +49,11 @@ function TradingViewWatchlist({
                 }
             ],
             "showSymbolLogo": true,
-            "isTransparent": true,
+            // `isTransparent: true` made this table paint its own light surface, ignoring
+            // colorTheme — the same behaviour the other embeds had, and the reason they all now ask
+            // for an explicit background instead of relying on the page showing through.
+            "isTransparent": false,
+            "backgroundColor": "#141414",
             "colorTheme": "dark",
             "locale": "en"
         });

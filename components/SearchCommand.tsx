@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react"
 import { CommandDialog, CommandEmpty, CommandInput, CommandList } from "@/components/ui/command"
-import {Button} from "@/components/ui/button";
 import {Loader2,  TrendingUp} from "lucide-react";
 import Link from "next/link";
 import {searchStocks} from "@/lib/actions/finnhub.actions";
@@ -65,9 +64,16 @@ export default function SearchCommand({ renderAs = 'button', label = 'Add stock'
                     {label}
                 </button>
             ): (
-                <Button onClick={() => setOpen(true)} className={className ?? "search-btn"}>
+                // A plain button, deliberately, not the shadcn <Button>.
+                //
+                // Its default variant paints `bg-primary`, which is near-white in dark mode
+                // (`oklch(0.929 …)`), and that survives a className which only sets a border and a
+                // text colour — so the dashboard's compact chip rendered as the lightest, loudest
+                // thing in a header of dark controls. This control's appearance belongs entirely to
+                // the caller's className, or to `.search-btn` when there is none.
+                <button type="button" onClick={() => setOpen(true)} className={className ?? "search-btn"}>
                     {label}
-                </Button>
+                </button>
             )}
             <CommandDialog open={open} onOpenChange={setOpen} className="search-dialog">
                 <div className="search-field">
