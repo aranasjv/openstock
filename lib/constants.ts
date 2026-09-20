@@ -55,7 +55,8 @@ export const MARKET_OVERVIEW_WIDGET_CONFIG = {
     dateRange: '12M', // last 12 months
     locale: 'en', // language
     largeChartUrl: '', // link to a large chart if needed
-    isTransparent: true, // makes background transparent
+    isTransparent: false,
+    backgroundColor: '#141414',
     showFloatingTooltip: true, // show tooltip on hover
     plotLineColorGrowing: '#0FEDBE', // line color when price goes up
     plotLineColorFalling: '#0FEDBE', // line color when price falls
@@ -131,7 +132,8 @@ export const TOP_STORIES_WIDGET_CONFIG = {
     displayMode: 'regular',
     feedMode: 'market',
     colorTheme: 'dark',
-    isTransparent: true,
+    isTransparent: false,
+    backgroundColor: '#141414',
     locale: 'en',
     market: 'stock',
     width: '100%',
@@ -284,7 +286,8 @@ export const CRYPTO_MARKET_OVERVIEW_WIDGET_CONFIG = {
     dateRange: '12M',
     locale: 'en',
     largeChartUrl: '',
-    isTransparent: true,
+    isTransparent: false,
+    backgroundColor: '#141414',
     showFloatingTooltip: true,
     plotLineColorGrowing: '#0FEDBE',
     plotLineColorFalling: '#0FEDBE',
@@ -361,7 +364,8 @@ export const CRYPTO_TOP_STORIES_WIDGET_CONFIG = {
     displayMode: 'regular',
     feedMode: 'market',
     colorTheme: 'dark',
-    isTransparent: true,
+    isTransparent: false,
+    backgroundColor: '#141414',
     locale: 'en',
     market: 'crypto',
     width: '100%',
