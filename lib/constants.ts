@@ -56,7 +56,6 @@ export const MARKET_OVERVIEW_WIDGET_CONFIG = {
     locale: 'en', // language
     largeChartUrl: '', // link to a large chart if needed
     isTransparent: false,
-    backgroundColor: '#141414',
     showFloatingTooltip: true, // show tooltip on hover
     plotLineColorGrowing: '#0FEDBE', // line color when price goes up
     plotLineColorFalling: '#0FEDBE', // line color when price falls
@@ -188,7 +187,8 @@ export const MARKET_DATA_WIDGET_CONFIG = {
 export const SYMBOL_INFO_WIDGET_CONFIG = (symbol: string) => ({
     symbol: symbol.toUpperCase(),
     colorTheme: 'dark',
-    isTransparent: true,
+    isTransparent: false,
+    backgroundColor: '#141414',
     locale: 'en',
     width: '100%',
     height: 170,
@@ -251,7 +251,8 @@ export const BASELINE_WIDGET_CONFIG = (symbol: string) => ({
 export const TECHNICAL_ANALYSIS_WIDGET_CONFIG = (symbol: string) => ({
     symbol: symbol.toUpperCase(),
     colorTheme: 'dark',
-    isTransparent: 'true',
+    isTransparent: false,
+    backgroundColor: '#141414',
     locale: 'en',
     width: '100%',
     height: 400,
@@ -262,7 +263,8 @@ export const TECHNICAL_ANALYSIS_WIDGET_CONFIG = (symbol: string) => ({
 export const COMPANY_PROFILE_WIDGET_CONFIG = (symbol: string) => ({
     symbol: symbol.toUpperCase(),
     colorTheme: 'dark',
-    isTransparent: 'true',
+    isTransparent: false,
+    backgroundColor: '#141414',
     locale: 'en',
     width: '100%',
     height: 440,
@@ -271,7 +273,8 @@ export const COMPANY_PROFILE_WIDGET_CONFIG = (symbol: string) => ({
 export const COMPANY_FINANCIALS_WIDGET_CONFIG = (symbol: string) => ({
     symbol: symbol.toUpperCase(),
     colorTheme: 'dark',
-    isTransparent: 'true',
+    isTransparent: false,
+    backgroundColor: '#141414',
     locale: 'en',
     width: '100%',
     height: 464,
@@ -287,7 +290,6 @@ export const CRYPTO_MARKET_OVERVIEW_WIDGET_CONFIG = {
     locale: 'en',
     largeChartUrl: '',
     isTransparent: false,
-    backgroundColor: '#141414',
     showFloatingTooltip: true,
     plotLineColorGrowing: '#0FEDBE',
     plotLineColorFalling: '#0FEDBE',
