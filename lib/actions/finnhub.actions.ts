@@ -159,7 +159,6 @@ export async function getWatchlistData(symbols: string[]) {
             name: profile?.name || sym,
             logo: profile?.logo,
             marketCap: profile?.marketCapitalization,
-            peRatio: 0 // Finnhub 'quote' and 'profile2' don't easily give real-time PE. Might need 'metric' endpoint, but skipping for now to save rate limits.
         };
     });
 
