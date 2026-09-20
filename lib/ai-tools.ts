@@ -574,6 +574,51 @@ export const AI_TOOLS: AITool[] = [
             };
         },
     },
+    {
+        spec: {
+            name: 'get_crypto_regime',
+            description:
+                'The crypto regime: a 0-100 composite over six published components (BTC trend structure, alt breadth, dominance, funding, drawdown/volatility, momentum thrust) with a RISK_ON / NEUTRAL / RISK_OFF zone. Use it for "what kind of market is this" questions about crypto. It is deterministic, so report its output rather than forming your own regime view; a null score means too little of the model could be computed to say anything.',
+            parameters: { type: 'object', properties: {} },
+        },
+        execute: async () => {
+            const { getCryptoRegime } = await import('@/lib/actions/regime.actions');
+            const report = await getCryptoRegime();
+
+            const components = report.components.map((component) => ({
+                key: component.key,
+                label: component.label,
+                weight: component.weight,
+                score: component.score,
+                signal: component.signal,
+            }));
+
+            const inputs = {
+                dominanceObservations: report.dominanceObservations,
+                universeSize: report.universeSize,
+                fundingSample: report.fundingSample,
+            };
+
+            if (report.score === null) {
+                return {
+                    zone: 'UNKNOWN' as const,
+                    components,
+                    inputs,
+                    note: 'Too little of the model could be computed for a score. Name the components that are null and what each needs; do not estimate a regime instead.',
+                };
+            }
+
+            return {
+                score: report.score,
+                zone: report.zone,
+                guidance: report.guidance,
+                asOf: report.asOf,
+                components,
+                inputs,
+                note: 'Deterministic output of the crypto-regime-analyzer playbook. Report the components and the zone — do not re-score them or infer a different verdict.',
+            };
+        },
+    },
 ];
 
 const TOOL_BY_NAME = new Map(AI_TOOLS.map((tool) => [tool.spec.name, tool]));

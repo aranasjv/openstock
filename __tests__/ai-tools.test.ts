@@ -70,6 +70,9 @@ vi.mock('@/lib/analysis-skills', () => ({
         options?.withBridge === false ? doc.body : `BRIDGE\n\n---\n\n${doc.body}`,
 }));
 
+const getCryptoRegime = vi.fn();
+vi.mock('@/lib/actions/regime.actions', () => ({ getCryptoRegime: () => getCryptoRegime() }));
+
 import { AI_TOOLS, getTool, getToolSpecs } from '@/lib/ai-tools';
 
 /** Names that would indicate a mutating tool slipped into the read-only registry. */
@@ -80,9 +83,9 @@ beforeEach(() => {
 });
 
 describe('tool registry shape', () => {
-    it('exposes twelve tools', () => {
-        expect(getToolSpecs()).toHaveLength(12);
-        expect(AI_TOOLS).toHaveLength(12);
+    it('exposes thirteen tools', () => {
+        expect(getToolSpecs()).toHaveLength(13);
+        expect(AI_TOOLS).toHaveLength(13);
     });
 
     it('gives every tool a unique, non-empty name and description', () => {
@@ -506,5 +509,68 @@ describe('get_benchmark', () => {
 
         const tool = getTool('get_benchmark')!;
         await expect(tool.execute({}, { userId: 'u' })).rejects.toThrow(/too little history/);
+    });
+});
+
+describe('get_crypto_regime', () => {
+    const components = [
+        { key: 'btc_trend', label: 'BTC Trend Structure', weight: 25, score: 100, signal: 'bull stack' },
+    ];
+
+    it('reports the composite, its components and the input coverage', async () => {
+        getCryptoRegime.mockResolvedValue({
+            score: 71.25,
+            zone: 'NEUTRAL',
+            guidance: 'Mixed conditions observed',
+            components,
+            effectiveWeights: { btc_trend: 25 },
+            asOf: '2026-01-01T00:00:00.000Z',
+            dominanceObservations: 2,
+            universeSize: 21,
+            fundingSample: 5,
+        });
+
+        const tool = getTool('get_crypto_regime')!;
+        const result = (await tool.execute({}, { userId: 'u' })) as {
+            score: number;
+            zone: string;
+            components: unknown[];
+            inputs: { dominanceObservations: number; universeSize: number };
+        };
+
+        expect(result.score).toBe(71.25);
+        expect(result.zone).toBe('NEUTRAL');
+        expect(result.components).toHaveLength(1);
+        // Input coverage travels with the score: a regime derived from two dominance points is a
+        // different claim from one derived from a month of them.
+        expect(result.inputs.dominanceObservations).toBe(2);
+        expect(result.inputs.universeSize).toBe(21);
+    });
+
+    it('says UNKNOWN rather than guessing when too little of the model could be computed', async () => {
+        getCryptoRegime.mockResolvedValue({
+            score: null,
+            zone: 'UNKNOWN',
+            guidance: 'Insufficient components',
+            components,
+            effectiveWeights: {},
+            asOf: '2026-01-01T00:00:00.000Z',
+            dominanceObservations: 1,
+            universeSize: 0,
+            fundingSample: 0,
+        });
+
+        const tool = getTool('get_crypto_regime')!;
+        const result = (await tool.execute({}, { userId: 'u' })) as {
+            score?: number;
+            zone: string;
+            note: string;
+        };
+
+        // The dangerous failure here is not a null score, it is a model that fills the gap with a
+        // plausible regime call. The note is the guard, so it is what the test pins.
+        expect(result.score).toBeUndefined();
+        expect(result.zone).toBe('UNKNOWN');
+        expect(result.note).toMatch(/do not estimate a regime/i);
     });
 });
