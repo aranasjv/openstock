@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { explainCandidate } from '@/lib/actions/screener.actions';
 import type { ScreenerCandidate } from '@/lib/actions/screener.actions';
 import { openCoinDrawer } from '@/lib/coin-drawer-event';
+import { openStockDrawer } from '@/lib/stock-drawer-event';
 import { formatCryptoPrice, formatPrice } from '@/lib/utils';
 
 interface CandidateRowProps {
@@ -59,14 +60,13 @@ export default function CandidateRow({ rank, candidate, assetType, strategyId }:
         });
     };
 
-    const detailPath = assetType === 'crypto' ? `/crypto/${candidate.symbol}` : `/stocks/${candidate.symbol}`;
-
-    // On crypto the drawer is the detail view, so the name opens it directly and the chevron
-    // keeps the checklist toggle separate. Stocks have no drawer, so the name still expands.
+    // Both asset types have a drawer now, so the name opens details and the chevron keeps the
+    // checklist toggle separate. Stocks used to expand in place, because they had no drawer to
+    // open — the same gesture did different things depending on the asset type.
     const isCrypto = assetType === 'crypto';
-    const handleNameClick = () => {
+    const openDetails = () => {
         if (isCrypto) openCoinDrawer(candidate.symbol);
-        else setExpanded((v) => !v);
+        else openStockDrawer(candidate.symbol);
     };
 
     return (
@@ -92,8 +92,8 @@ export default function CandidateRow({ rank, candidate, assetType, strategyId }:
 
                 <button
                     type="button"
-                    onClick={handleNameClick}
-                    title={isCrypto ? 'Open details' : undefined}
+                    onClick={openDetails}
+                    title="Open details"
                     className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
                 >
                     <span className="truncate text-sm font-medium text-gray-100 hover:text-teal-300">
@@ -164,19 +164,13 @@ export default function CandidateRow({ rank, candidate, assetType, strategyId }:
                             <Sparkles className="mr-1.5 h-3 w-3" />
                             {pending ? 'Generating…' : 'Explain with AI'}
                         </Button>
-                        {isCrypto ? (
-                            <button
-                                type="button"
-                                onClick={() => openCoinDrawer(candidate.symbol)}
-                                className="text-xs text-teal-400 hover:text-teal-300"
-                            >
-                                Open details →
-                            </button>
-                        ) : (
-                            <a href={detailPath} className="text-xs text-teal-400 hover:text-teal-300">
-                                View details →
-                            </a>
-                        )}
+                        <button
+                            type="button"
+                            onClick={openDetails}
+                            className="text-xs text-teal-400 hover:text-teal-300"
+                        >
+                            Open details →
+                        </button>
                     </div>
 
                     {explanation ? (
