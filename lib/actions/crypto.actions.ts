@@ -55,6 +55,19 @@ const DEFAULT_SPACING_MS = 250;
 let requestChain: Promise<void> = Promise.resolve();
 let lastRequestAt = 0;
 
+/**
+ * Circuit breaker for the shared CoinGecko quota.
+ *
+ * A 429 is not about one request — it means the account's quota is spent. Retrying every
+ * screener symbol on its own schedule therefore keeps the quota exhausted and the page never
+ * finishes: observed live, with each symbol cycling 15s retries while the serialised gate held
+ * everything behind it. Once the API says back off, every caller stops asking until the window
+ * passes, so the screener degrades to "unavailable" and renders instead of grinding.
+ *
+ * Per-process, like the gate above — see the note in AGENTS.md on single-replica assumptions.
+ */
+let rateLimitedUntil = 0;
+
 function spacingFor(path: string): number {
     return path.includes('/market_chart') ? MARKET_CHART_SPACING_MS : DEFAULT_SPACING_MS;
 }
@@ -90,9 +103,17 @@ async function fetchCoinGecko<T>(path: string, revalidateSeconds?: number): Prom
     const baseUrl = (config.COINGECKO_API_BASE_URL || DEFAULT_COINGECKO_BASE_URL).replace(/\/$/, '');
     const apiKey = config.COINGECKO_API_KEY || '';
 
-    const MAX_ATTEMPTS = 3;
+    // Two attempts rather than three: with Retry-After clamped at 15s, a third attempt let a
+    // single symbol occupy the serialised gate for half a minute.
+    const MAX_ATTEMPTS = 2;
 
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        // The quota is shared, so once the breaker has tripped there is nothing to gain by
+        // asking again — and every symbol that asks keeps the page waiting.
+        if (Date.now() < rateLimitedUntil) {
+            return null;
+        }
+
         await scheduleRequest(path);
 
         const controller = new AbortController();
@@ -111,11 +132,16 @@ async function fetchCoinGecko<T>(path: string, revalidateSeconds?: number): Prom
 
             if (res.status === 429) {
                 const delay = retryDelayMs(res, attempt);
-                console.warn(
-                    `CoinGecko rate limited (429) for ${path}; retrying in ${delay}ms` +
-                        (attempt === MAX_ATTEMPTS - 1 ? ' — giving up' : '')
-                );
-                if (attempt === MAX_ATTEMPTS - 1) return null;
+
+                // Trip the breaker for every caller, not just this one.
+                rateLimitedUntil = Math.max(rateLimitedUntil, Date.now() + delay);
+
+                if (attempt === MAX_ATTEMPTS - 1) {
+                    console.warn(`CoinGecko rate limited (429) for ${path}; giving up`);
+                    return null;
+                }
+
+                console.warn(`CoinGecko rate limited (429) for ${path}; retrying in ${delay}ms`);
                 await new Promise((resolve) => setTimeout(resolve, delay));
                 continue;
             }
