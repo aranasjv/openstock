@@ -11,6 +11,7 @@ import {
 import { getCryptoMarkets, searchCrypto } from "@/lib/actions/crypto.actions";
 import SetupsSection from "@/components/screener/SetupsSection";
 import AskAiButton from "@/components/assistant/AskAiButton";
+import CryptoRegimePanel from "@/components/regime/CryptoRegimePanel";
 
 interface CryptoDashboardProps {
     searchParams: Promise<{ strategy?: string }>;
@@ -67,6 +68,11 @@ export default async function CryptoDashboard({ searchParams }: CryptoDashboardP
                     />
                 </div>
             </header>
+
+            {/* Rendered above the widgets because it is context for everything below it: whether
+                the tape behind the coin list and the screener is risk-on or risk-off. It streams in
+                on its own, so the dashboards paint immediately while the regime resolves. */}
+            <CryptoRegimePanel />
 
             <section className="grid shrink-0 gap-2 xl:grid-cols-3">
                 <TradingViewWidget
