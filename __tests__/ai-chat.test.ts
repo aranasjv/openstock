@@ -257,6 +257,41 @@ describe('analysis playbook wiring', () => {
         expect(system).toContain('get_analysis_playbook');
     });
 
+    it('routes the question to a playbook by intent, not by keyword', async () => {
+        listAnalysisSkills.mockResolvedValue([
+            {
+                id: 'position-sizer',
+                name: 'position-sizer',
+                description: 'Risk-based position sizing for long trades.',
+                references: [],
+                hasScripts: false,
+            },
+            {
+                id: 'frontend-design',
+                name: 'frontend-design',
+                description: 'Interface design.',
+                references: [],
+                hasScripts: false,
+            },
+        ]);
+        callAIProviderWithTools.mockResolvedValue({ content: 'ok' });
+
+        await runChatTurn({ history: [{ role: 'user', content: 'size this' }], userId: 'u' });
+
+        const [messages] = callAIProviderWithTools.mock.calls[0];
+        const system = messages[0].content as string;
+
+        // "Sizing a position" is the route, so the model does not have to infer which playbook suits
+        // the question from a 180-character description — which is the failure the routing prevents.
+        expect(system).toContain('Sizing a position');
+        expect(system).toContain('position-sizer');
+
+        // And the three vendored for coding agents are named as out of scope rather than left sitting
+        // in the catalogue for a market question to trip over.
+        expect(system).toContain('coding agents');
+        expect(system).toContain('frontend-design');
+    });
+
     it('omits the playbook section when none are installed', () => {
         const prompt = buildAssistantSystemPrompt({ date: '2026-01-01', defaultStrategy: 'trend-following' });
         expect(prompt).not.toContain('ANALYSIS PLAYBOOKS');

@@ -102,6 +102,59 @@ function summarise(result: unknown): string {
 }
 
 /**
+ * Which playbook answers which shape of question.
+ *
+ * The catalogue underneath lists ids, which is enough to fetch one you already know you want and not
+ * enough to choose from a vaguely-worded question — and the failure that costs something is a model
+ * answering a sizing question from general knowledge while `position-sizer` sits one tool call away,
+ * unread. Routing is by what the user is trying to do, not by keywords in their sentence.
+ *
+ * Static rather than derived from the registry: these are judgement calls about which methodology
+ * suits which question, and a new playbook should be routed deliberately rather than inheriting a
+ * position from its filename.
+ */
+const PLAYBOOK_ROUTES: { when: string; ids: string[] }[] = [
+    { when: 'Assessing one stock on its own', ids: ['us-stock-analysis', 'technical-analyst'] },
+    {
+        when: 'Reading the US market as a whole, or deciding how much exposure to carry',
+        ids: ['market-breadth-analyzer', 'uptrend-analyzer', 'exposure-coach'],
+    },
+    { when: 'Reading the crypto market as a whole', ids: ['crypto-regime-analyzer'] },
+    {
+        when: 'Hunting for setups to buy',
+        ids: ['vcp-screener', 'canslim-screener', 'breakout-trade-planner'],
+    },
+    {
+        when: 'Sizing a position, or deciding whether to take one at all',
+        ids: ['position-sizer', 'pre-trade-discipline-gate', 'drawdown-circuit-breaker'],
+    },
+    {
+        when: 'Recording, reviewing or grading trades already taken',
+        ids: [
+            'trader-memory-core',
+            'signal-postmortem',
+            'trade-performance-coach',
+            'weekly-performance-digest',
+        ],
+    },
+    {
+        when: 'Explaining what moved, or what is coming up',
+        ids: ['market-news-analyst', 'market-environment-analysis', 'earnings-calendar'],
+    },
+    {
+        when: 'Asking whether a strategy or rule actually works',
+        ids: ['backtest-expert'],
+    },
+];
+
+/** Vendored for coding agents working on this repo, not for answering market questions. */
+const ENGINEERING_PLAYBOOKS = [
+    'frontend-design',
+    'vercel-react-best-practices',
+    'web-design-guidelines',
+];
+
+/**
  * The system prompt. Two jobs: stop the model inventing market data, and keep it inside the
  * same not-advice boundary the rest of the app uses.
  */
@@ -127,6 +180,10 @@ export function buildAssistantSystemPrompt(context: {
                   '- A playbook is a methodology, not a source of figures. Its example numbers are',
                   '  illustrative — every figure you report must still come from a tool call.',
                   '',
+                  'Which to load, by what the user is trying to do:',
+                  ...PLAYBOOK_ROUTES.map((route) => `- ${route.when} → ${route.ids.join(', ')}`),
+                  '',
+                  'The full catalogue, for anything the routes do not cover:',
                   ...playbooks.map((playbook) => {
                       const description =
                           playbook.description.length > PLAYBOOK_DESCRIPTION_CHARS
@@ -134,6 +191,9 @@ export function buildAssistantSystemPrompt(context: {
                               : playbook.description;
                       return `- ${playbook.id}: ${description}`;
                   }),
+                  '',
+                  `Three of those are vendored for coding agents on this repository rather than for you:`,
+                  `${ENGINEERING_PLAYBOOKS.join(', ')}. Do not load them to answer market questions.`,
               ];
 
     return [

@@ -116,3 +116,20 @@ describe('getConfigNumber', () => {
         expect(await getConfigNumber('SCREENER_UNIVERSE_SIZE', 12)).toBe(100);
     });
 });
+
+describe('the default AI report prompt', () => {
+    it('sends the briefing through the playbooks instead of general knowledge', async () => {
+        const { DEFAULT_REPORT_PROMPT } = await freshConfig();
+
+        // The report runs with nobody watching, so "use the methodology" has to be stated in the
+        // prompt — a model asked for a market backdrop will otherwise write one from memory, which is
+        // the exact failure the rest of this system is built to prevent.
+        expect(DEFAULT_REPORT_PROMPT).toContain('get_analysis_playbook');
+        expect(DEFAULT_REPORT_PROMPT).toContain('market-breadth-analyzer');
+        expect(DEFAULT_REPORT_PROMPT).toContain('crypto-regime-analyzer');
+
+        // And a playbook that will not load degrades to "unavailable" rather than to the model's own
+        // view of the market.
+        expect(DEFAULT_REPORT_PROMPT).toMatch(/unavailable instead of/);
+    });
+});
