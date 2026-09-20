@@ -49,7 +49,12 @@ type RawCoinMarket = {
  * Requests are chained rather than merely delayed, so concurrency is one by construction
  * and there is no window where two calls slip through together.
  */
+/**
+ * An API key raises that ceiling by an order of magnitude, so the conservative spacing is only
+ * correct without one — with a key it is twelve symbols each waiting two seconds for nothing.
+ */
 const MARKET_CHART_SPACING_MS = 2_000;
+const MARKET_CHART_SPACING_WITH_KEY_MS = 250;
 const DEFAULT_SPACING_MS = 250;
 
 let requestChain: Promise<void> = Promise.resolve();
@@ -68,12 +73,13 @@ let lastRequestAt = 0;
  */
 let rateLimitedUntil = 0;
 
-function spacingFor(path: string): number {
-    return path.includes('/market_chart') ? MARKET_CHART_SPACING_MS : DEFAULT_SPACING_MS;
+function spacingFor(path: string, hasApiKey: boolean): number {
+    if (!path.includes('/market_chart')) return DEFAULT_SPACING_MS;
+    return hasApiKey ? MARKET_CHART_SPACING_WITH_KEY_MS : MARKET_CHART_SPACING_MS;
 }
 
-function scheduleRequest(path: string): Promise<void> {
-    const spacing = spacingFor(path);
+function scheduleRequest(path: string, hasApiKey: boolean): Promise<void> {
+    const spacing = spacingFor(path, hasApiKey);
 
     const scheduled = requestChain.then(async () => {
         // Leave the queue entirely while the quota is exhausted. Without this every queued
@@ -121,7 +127,7 @@ async function fetchCoinGecko<T>(path: string, revalidateSeconds?: number): Prom
             return null;
         }
 
-        await scheduleRequest(path);
+        await scheduleRequest(path, Boolean(apiKey));
 
         // Checked again *after* the gate. The screener issues its coin-history requests
         // concurrently, so they all pass the check above before the first 429 has come back —
