@@ -14,13 +14,12 @@ import { useDragSize } from '@/hooks/useDragSize';
 /**
  * The assistant as a floating, resizable panel.
  *
- * Mounted once in the root layout and opened by event — the same contract as the coin drawer —
- * so any client component can summon it without prop threading. "Ask AI" on either dashboard
- * opens this instead of navigating to /assistant, which keeps the screener or chart you were
- * reading behind it.
+ * Mounted once in the root layout and opened by event — the same contract as the coin drawer — so
+ * any client component can summon it without prop threading, and the launcher below is on every page
+ * rather than in the headers of the two pages that remembered to add it.
  *
- * The conversation is loaded on first open rather than at mount: most page views never open
- * the assistant, and doing this eagerly would add a database round trip to every navigation.
+ * The conversation is loaded on first open rather than at mount: most page views never open the
+ * assistant, and doing this eagerly would add a database round trip to every navigation.
  *
  * Sizing is deliberately double-clamped — numerically in `useDragSize`, and again with
  * viewport-relative `max-*` classes here. A size stored on a large monitor would otherwise

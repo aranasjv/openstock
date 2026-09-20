@@ -24,6 +24,13 @@ async function freshConfig() {
 }
 
 beforeEach(() => {
+    // The first test imports `@/lib/config`, which pulls in mongoose — a module graph measured at
+    // ~16 seconds under a fully parallel run against vitest's 5-second default. Every later test
+    // reuses the resolved graph and runs in single-digit milliseconds. Raised rather than mocked
+    // away: resolving that graph is part of what these tests exercise, and the failure it produced
+    // was a timeout that looks exactly like a hang in the config system.
+    vi.setConfig({ testTimeout: 30_000 });
+
     findOne.mockReset();
     dbThrows = false;
     delete process.env.AI_PROVIDER;

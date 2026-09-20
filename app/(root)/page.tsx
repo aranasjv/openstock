@@ -1,4 +1,3 @@
-import AskAiButton from "@/components/assistant/AskAiButton";
 import BreadthStrip from "@/components/breadth/BreadthStrip";
 import MarketToggle from "@/components/market/MarketToggle";
 import PhNewsPanel from "@/components/ph/PhNewsPanel";
@@ -82,7 +81,6 @@ const Home = async ({ searchParams }: HomeProps) => {
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                     <MarketToggle market={market} />
-                    <AskAiButton />
                     {/* The palette searches US listings only, so it is hidden on the PSE rather than
                         offered and then failing on a market it cannot serve. */}
                     {market === 'us' ? (

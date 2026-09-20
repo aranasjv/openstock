@@ -10,7 +10,6 @@ import {
 } from "@/lib/constants";
 import { getCryptoMarkets, searchCrypto } from "@/lib/actions/crypto.actions";
 import SetupsSection from "@/components/screener/SetupsSection";
-import AskAiButton from "@/components/assistant/AskAiButton";
 import CryptoRegimePanel from "@/components/regime/CryptoRegimePanel";
 
 interface CryptoDashboardProps {
@@ -53,7 +52,6 @@ export default async function CryptoDashboard({ searchParams }: CryptoDashboardP
                     </span>
                 </div>
                 <div className="flex items-center gap-2">
-                    <AskAiButton className="inline-flex items-center gap-1.5 rounded-md border border-teal-900/50 bg-teal-950/30 px-2.5 py-1.5 text-[11px] text-teal-300 transition-colors hover:bg-teal-900/30" />
                     <Link
                         href="/watchlist?tab=crypto"
                         className="rounded-md border border-gray-800 px-2.5 py-1.5 text-[11px] text-gray-300 transition-colors hover:bg-white/5"
