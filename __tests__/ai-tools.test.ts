@@ -72,8 +72,12 @@ vi.mock('@/lib/analysis-skills', () => ({
 
 const getCryptoRegime = vi.fn();
 const evaluateBreakerForUser = vi.fn();
+const portfolioRiskForUser = vi.fn();
 vi.mock('@/lib/crypto-regime-live', () => ({ getCryptoRegime: () => getCryptoRegime() }));
 vi.mock('@/lib/data/theses', () => ({ evaluateBreakerForUser: (userId: string) => evaluateBreakerForUser(userId) }));
+vi.mock('@/lib/portfolio-risk-live', () => ({
+    portfolioRiskForUser: (userId: string) => portfolioRiskForUser(userId),
+}));
 
 import { AI_TOOLS, getTool, getToolSpecs } from '@/lib/ai-tools';
 
@@ -85,9 +89,9 @@ beforeEach(() => {
 });
 
 describe('tool registry shape', () => {
-    it('exposes fifteen tools', () => {
-        expect(getToolSpecs()).toHaveLength(15);
-        expect(AI_TOOLS).toHaveLength(15);
+    it('exposes sixteen tools', () => {
+        expect(getToolSpecs()).toHaveLength(16);
+        expect(AI_TOOLS).toHaveLength(16);
     });
 
     it('gives every tool a unique, non-empty name and description', () => {
@@ -686,5 +690,57 @@ describe('run_backtest', () => {
         expect(result.verdict).not.toBe('DEPLOY');
         expect(result.redFlags.length).toBeGreaterThan(0);
         expect(result.note).toMatch(/never present a backtest as evidence/i);
+    });
+});
+
+describe('get_portfolio_risk', () => {
+    const report = (overrides: Record<string, unknown> = {}) => ({
+        totalValue: 100_000,
+        positions: 3,
+        concentration: { topSymbol: 'AAPL', topWeightPct: 60, hhi: 0.46, effectivePositions: 2.2 },
+        volatilityPct: 41.2,
+        naiveVolatilityPct: 24.8,
+        beta: 1.3,
+        benchmark: { symbol: 'SPY', reason: 'stocks are 100% of the book by value' },
+        coverage: { withHistory: 3, total: 3 },
+        excluded: [],
+        withoutHistory: [],
+        ...overrides,
+    });
+
+    it('reports coverage alongside the figures', async () => {
+        portfolioRiskForUser.mockResolvedValue(report({ coverage: { withHistory: 2, total: 3 } }));
+
+        const tool = getTool('get_portfolio_risk')!;
+        const result = (await tool.execute({}, { userId: 'u1' })) as {
+            note: string;
+            coverage: { withHistory: number };
+        };
+
+        expect(portfolioRiskForUser).toHaveBeenCalledWith('u1');
+        expect(result.coverage.withHistory).toBe(2);
+        expect(result.note).toMatch(/2 of 3/);
+    });
+
+    it('tells the model the correlation gap is the thing worth explaining', async () => {
+        portfolioRiskForUser.mockResolvedValue(report());
+
+        const tool = getTool('get_portfolio_risk')!;
+        const result = (await tool.execute({}, { userId: 'u1' })) as { note: string };
+
+        // Covariance above the naive figure is the signal; without this the model reports both
+        // numbers and explains neither.
+        expect(result.note).toMatch(/correlation/i);
+    });
+
+    it('refuses to characterise risk for an empty book', async () => {
+        portfolioRiskForUser.mockResolvedValue(
+            report({ positions: 0, totalValue: 0, volatilityPct: null, beta: null })
+        );
+
+        const tool = getTool('get_portfolio_risk')!;
+        const result = (await tool.execute({}, { userId: 'u1' })) as { note: string };
+
+        expect(result.note).toMatch(/rather than estimating/i);
     });
 });

@@ -712,6 +712,35 @@ export const AI_TOOLS: AITool[] = [
             };
         },
     },
+    {
+        spec: {
+            name: 'get_portfolio_risk',
+            description:
+                'Risk for the user\'s own portfolio: concentration (top weight and effective number of positions), annualised volatility from the covariance matrix, and beta against SPY or BTC. Use it when asked whether a portfolio is diversified or how risky it is — volatility accounts for correlation, so it will exceed a simple average of the holdings\' own volatilities when they move together.',
+            parameters: { type: 'object', properties: {} },
+        },
+        execute: async (_args, ctx) => {
+            const { portfolioRiskForUser } = await import('@/lib/portfolio-risk-live');
+            const report = await portfolioRiskForUser(ctx.userId);
+
+            return {
+                totalValue: report.totalValue,
+                positions: report.positions,
+                concentration: report.concentration,
+                volatilityPct: report.volatilityPct,
+                naiveVolatilityPct: report.naiveVolatilityPct,
+                beta: report.beta,
+                benchmark: report.benchmark,
+                coverage: report.coverage,
+                excluded: report.excluded,
+                withoutHistory: report.withoutHistory,
+                note:
+                    report.positions === 0
+                        ? 'No priced positions, so there is no risk to report. Say that rather than estimating.'
+                        : `Report the figures and the coverage together — ${report.coverage.withHistory} of ${report.coverage.total} holdings had usable history. When volatility is materially above the naive figure, that gap is correlation and is the point worth explaining.`,
+            };
+        },
+    },
 ];
 
 const TOOL_BY_NAME = new Map(AI_TOOLS.map((tool) => [tool.spec.name, tool]));
