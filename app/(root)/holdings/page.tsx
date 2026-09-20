@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getPortfolioSummary } from '@/lib/actions/holdings.actions';
 import HoldingsManager from '@/components/holdings/HoldingsManager';
+import PortfolioRiskPanel from '@/components/holdings/PortfolioRiskPanel';
 import { formatPrice } from '@/lib/utils';
 
 export default async function HoldingsPage() {
@@ -57,6 +58,8 @@ export default async function HoldingsPage() {
                     positions rather than counting them as zero.
                 </p>
             ) : null}
+
+            <PortfolioRiskPanel userId={session.user.id} />
 
             <HoldingsManager holdings={summary.holdings} />
         </div>
