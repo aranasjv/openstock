@@ -34,7 +34,7 @@ const UserDropdown = ({
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button className="flex items-center gap-3 text-gray-4 hover:bg-gray-800 bg-gray-800">
+                <Button className="flex items-center gap-3 text-gray-400 hover:bg-gray-800 bg-gray-800">
                     <Avatar className="h-8 w-8">
                         <AvatarImage src="https://media.licdn.com/dms/image/v2/D560BAQGHApE1Vtq6DA/company-logo_200_200/B56ZY1OFJOGcAI-/0/1744649609317/philosopai_in_logo?e=1761782400&v=beta&t=uLNK6v7h96sXybdT42cVK0cJSZaA8KVLw8JYO5fY4oQ" />
                         <AvatarFallback className="bg-teal-500 text-teal-900 text-sm font-bold">

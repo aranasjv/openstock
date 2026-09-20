@@ -25,14 +25,35 @@ export function delay(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Formatted string like "$3.10T", "$900.00B", "$25.00M" or "$999999.99"
+/*
+ * Compact currency and number formatting.
+ *
+ * Built on Intl rather than hand-rolled `(value / 1e9).toFixed(2) + 'B'`, which hardcoded the
+ * suffix order, the decimal count and the locale in one expression. `Intl` was already used
+ * elsewhere in this file, so the two styles disagreed with each other as well as with the
+ * platform.
+ */
+const COMPACT_USD = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    notation: 'compact',
+    maximumFractionDigits: 2,
+});
+
+const COMPACT = new Intl.NumberFormat('en-US', {
+    notation: 'compact',
+    maximumFractionDigits: 2,
+});
+
+// Formatted string like "$3.1T", "$900B", "$25M" or "$999999.99"
 export function formatMarketCapValue(marketCapUsd: number): string {
     if (!Number.isFinite(marketCapUsd) || marketCapUsd <= 0) return 'N/A';
 
-    if (marketCapUsd >= 1e12) return `$${(marketCapUsd / 1e12).toFixed(2)}T`; // Trillions
-    if (marketCapUsd >= 1e9) return `$${(marketCapUsd / 1e9).toFixed(2)}B`; // Billions
-    if (marketCapUsd >= 1e6) return `$${(marketCapUsd / 1e6).toFixed(2)}M`; // Millions
-    return `$${marketCapUsd.toFixed(2)}`; // Below one million, show full USD amount
+    // Below a million compact notation rounds 999,999.99 up to "$1M", which overstates it — the
+    // exact figure matters more than the width at that scale.
+    if (marketCapUsd < 1e6) return `$${marketCapUsd.toFixed(2)}`;
+
+    return COMPACT_USD.format(marketCapUsd);
 }
 
 export const getDateRange = (days: number) => {
@@ -125,11 +146,7 @@ export function formatNumber(num: number): string {
     // If we assume typical market cap input IS millions:
     const value = num * 1000000;
 
-    if (value >= 1e12) return (value / 1e12).toFixed(2) + 'T';
-    if (value >= 1e9) return (value / 1e9).toFixed(2) + 'B';
-    if (value >= 1e6) return (value / 1e6).toFixed(2) + 'M';
-    if (value >= 1e3) return (value / 1e3).toFixed(2) + 'K';
-    return value.toString();
+    return COMPACT.format(value);
 }
 
 export const formatDateToday = new Date().toLocaleDateString('en-US', {

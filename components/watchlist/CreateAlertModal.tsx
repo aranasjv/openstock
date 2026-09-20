@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -78,6 +78,13 @@ export default function CreateAlertModal({
             <DialogContent className="sm:max-w-[425px] bg-[#0A0A0A] border-gray-800 text-white shadow-2xl">
                 <DialogHeader>
                     <DialogTitle className="text-2xl font-bold tracking-tight text-white mb-2">Price Alert</DialogTitle>
+                    {/* Radix warns without a description, and a dialog with no description is
+                        announced without context. The fields are self-explanatory on screen, so
+                        this is for screen readers only. */}
+                    <DialogDescription className="sr-only">
+                        Set a price alert for this asset and choose whether it should trigger above
+                        or below the target price.
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-5 py-2 relative z-10">
 

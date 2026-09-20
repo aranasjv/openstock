@@ -70,7 +70,7 @@ export default function WatchlistTable({ data, onRefresh }: WatchlistTableProps)
     }
 
     return (
-        <div className="overflow-hidden rounded-xl border border-white/10 bg-black/40 backdrop-blur-md shadow-xl">
+        <div className="overflow-x-auto rounded-xl border border-white/10 bg-black/40 backdrop-blur-md shadow-xl">
             <table className="w-full text-left text-sm border-collapse">
                 <thead className="bg-white/5 text-gray-400 font-medium border-b border-white/10">
                     <tr>

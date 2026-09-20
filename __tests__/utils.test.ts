@@ -137,15 +137,15 @@ describe('formatMarketCapValue', () => {
     });
 
     it('formats trillions', () => {
-        expect(formatMarketCapValue(3.1e12)).toBe('$3.10T');
+        expect(formatMarketCapValue(3.1e12)).toBe('$3.1T');
     });
 
     it('formats billions', () => {
-        expect(formatMarketCapValue(900e9)).toBe('$900.00B');
+        expect(formatMarketCapValue(900e9)).toBe('$900B');
     });
 
     it('formats millions', () => {
-        expect(formatMarketCapValue(25e6)).toBe('$25.00M');
+        expect(formatMarketCapValue(25e6)).toBe('$25M');
     });
 
     it('formats sub-million values', () => {
