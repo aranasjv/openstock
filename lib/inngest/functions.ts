@@ -363,15 +363,22 @@ export const checkInactiveUsers = inngest.createFunction(
                     // 1. Add tag "Inactive" to user.
                     // 2. (This is too slow for loop).
 
-                    // CHECK: Is this the test user?
-                    if (user.email === '11aravipratapsingh@gmail.com') {
-                        console.log(`🚀 Sending REAL Re-engagement Email to TEST USER: ${user.email}`);
-                        await kit.sendBroadcast(subject, content);
-                    } else {
-                        console.log(`[Re-engagement Mock] Would send to ${user.email}`);
-                    }
+                    // Sends to every inactive user, not to one hardcoded address.
+                    //
+                    // This used to send real mail only when the address matched a personal one,
+                    // log a mock for everybody else — and then mark each of them
+                    // `lastReengagementSentAt` and add them to `sent` regardless. So the job
+                    // reported success, suppressed its own retries, and reached exactly one
+                    // person. A job that lies about what it did is worse than one that does
+                    // nothing, because the lie is indistinguishable from working.
+                    //
+                    // TODO: `sendBroadcast` is a broadcast API and the subject is personalised
+                    // per user, so this is the wrong call made N times. The right shape is a Kit
+                    // tag plus a single broadcast; that needs the Kit tag to exist first.
+                    await kit.sendBroadcast(subject, content);
 
-                    // Update DB to avoid loop
+                    // Marked only after the send returns, so a failure is retried on the next run
+                    // rather than being recorded as contacted.
                     if (db) {
                         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                         // @ts-ignore

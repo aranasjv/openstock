@@ -128,10 +128,15 @@ export async function runAlertCheck(): Promise<AlertCheckResult> {
 
     // Mark triggered only after attempting delivery, so a failed send is retried next tick
     // rather than silently swallowing the alert.
+    //
+    // One round trip rather than one per alert: the loop awaited each document in turn, so a
+    // hundred triggered alerts meant a hundred sequential writes before the tick could finish —
+    // and the scheduler holds the next tick off until this returns.
     const { Alert: AlertModel } = await import('@/database/models/alert.model');
-    for (const alert of triggered) {
-        await AlertModel.findByIdAndUpdate(alert.id, { triggered: true, active: false });
-    }
+    await AlertModel.updateMany(
+        { _id: { $in: triggered.map((alert) => alert.id) } },
+        { triggered: true, active: false }
+    );
 
     return { processed: activeAlerts.length, triggered: triggered.length, notified };
 }
