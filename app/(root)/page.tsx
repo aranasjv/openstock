@@ -1,20 +1,19 @@
 import AskAiButton from "@/components/assistant/AskAiButton";
 import BreadthStrip from "@/components/breadth/BreadthStrip";
 import MarketToggle from "@/components/market/MarketToggle";
+import PhNewsPanel from "@/components/ph/PhNewsPanel";
 import PseMarketTable from "@/components/ph/PseMarketTable";
+import PseMovers from "@/components/ph/PseMovers";
 import SearchCommand from "@/components/SearchCommand";
 import { searchStocks } from "@/lib/actions/finnhub.actions";
 import TradingViewWidget from "@/components/TradingViewWidget";
 import SetupsSection from "@/components/screener/SetupsSection";
-import { fetchPseMarket } from "@/lib/phisix";
 import { parseMarket } from "@/lib/markets";
 import {
     HEATMAP_WIDGET_CONFIG,
     MARKET_DATA_WIDGET_CONFIG,
     MARKET_OVERVIEW_WIDGET_CONFIG,
-    PH_INDEX_WIDGET_CONFIG,
     TOP_STORIES_WIDGET_CONFIG,
-    phQuotesWidgetConfig,
 } from "@/lib/constants";
 
 interface HomeProps {
@@ -33,10 +32,12 @@ interface HomeProps {
  * server-renderable, and matches how the screener's strategy is already chosen on this page.
  *
  * The two branches are not symmetric, and the asymmetry is honest rather than unfinished. For the
- * US, every panel is a real feed. For the PSE, charts and quotes come from TradingView and the
- * table from phisix, but the screener cannot run at all — it scores trend and momentum from daily
- * bars, and no source this app can reach carries PSE history. So the PSE branch states that instead
- * of rendering an empty screener that looks like "nothing matched today".
+ * US, every panel is a real feed. For the PSE, everything now comes from phisix: the TradingView
+ * panels originally tried there did not render — the index reported its symbol as available only on
+ * TradingView, and the quotes board came back empty — and neither was a configuration mistake, so
+ * they were replaced rather than repaired. The screener still cannot run at all, because it scores
+ * trend and momentum from daily bars and no source this app can reach carries PSE history. The PSE
+ * branch states that instead of rendering an empty screener that looks like "nothing matched today".
  */
 const WIDGET_HEIGHT = 280;
 
@@ -45,19 +46,9 @@ const Home = async ({ searchParams }: HomeProps) => {
     const market = parseMarket(marketParam);
     const scriptUrl = `https://s3.tradingview.com/external-embedding/embed-widget-`;
 
-    // One fetch per market, and only the one in use. The US palette and the PSE table have nothing
-    // in common, so fetching both would pay twice for half of it.
-    const [initialStocks, pse] = await Promise.all([
-        market === 'us' ? searchStocks() : Promise.resolve([]),
-        market === 'ph' ? fetchPseMarket() : Promise.resolve(null),
-    ]);
-
-    // The quote board is built from what the feed says is trading, not from a curated list — a
-    // hardcoded set would drift from the market it claims to show.
-    const phSymbols = (pse?.quotes ?? []).slice(0, 15).map((quote) => ({
-        symbol: quote.symbol,
-        name: quote.name,
-    }));
+    // Only the US palette is pre-fetched. The PSE panels read the feed themselves and share the same
+    // cached request, so pre-fetching here would buy nothing while adding a second source of truth.
+    const initialStocks = market === 'us' ? await searchStocks() : [];
 
     // The header chip dimensions are shared with "Ask AI" so the two read as one row of controls
     // rather than one small link and one large button.
@@ -144,20 +135,11 @@ const Home = async ({ searchParams }: HomeProps) => {
                 </>
             ) : (
                 <>
-                    <section className="grid shrink-0 gap-2 xl:grid-cols-3">
-                        <TradingViewWidget
-                            title="PSEi Index"
-                            scriptUrl={`${scriptUrl}advanced-chart.js`}
-                            config={PH_INDEX_WIDGET_CONFIG}
-                            className="custom-chart"
-                            height={WIDGET_HEIGHT}
-                        />
-                        <TradingViewWidget
-                            title="PSE Quotes"
-                            scriptUrl={`${scriptUrl}market-quotes.js`}
-                            config={phQuotesWidgetConfig(phSymbols)}
-                            height={WIDGET_HEIGHT}
-                        />
+                    {/* Both PH rows share the viewport instead of the first sizing to its content.
+                        That was the defect in the previous version: the market table grew the page
+                        rather than scrolling inside it, so the dashboard ran past the fold. */}
+                    <section className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[1fr_1.6fr]">
+                        <PseMovers />
                         <PseMarketTable />
                     </section>
 
@@ -173,14 +155,7 @@ const Home = async ({ searchParams }: HomeProps) => {
                                 rather than simply returning no matches.
                             </p>
                         </div>
-                        <div className="h-full min-h-0">
-                            <TradingViewWidget
-                                title="Top Stories"
-                                scriptUrl={`${scriptUrl}timeline.js`}
-                                config={TOP_STORIES_WIDGET_CONFIG}
-                                fill
-                            />
-                        </div>
+                        <PhNewsPanel />
                     </section>
                 </>
             )}
