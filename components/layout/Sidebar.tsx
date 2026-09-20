@@ -13,7 +13,7 @@ import { formatCryptoPrice, formatPrice } from '@/lib/utils';
  * scores. Replaces the former top header so page content gets the full remaining width.
  *
  * Everything here is served from caches that already exist — the screener shares its cached
- * scan with the dashboard's Must Buy section, and holdings prices come from the same batched
+ * scan with the dashboard's Setups section, and holdings prices come from the same batched
  * lookups — so the sidebar adds no new data sources.
  */
 export default async function Sidebar({ user }: { user: User }) {

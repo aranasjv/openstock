@@ -158,7 +158,7 @@ export function buildAssistantSystemPrompt(context: {
         'CONTEXT:',
         `- Today (UTC): ${context.date}`,
         `- Default screener strategy: ${context.defaultStrategy}`,
-        '- The Must Buy screener is a deterministic rules engine. Its ranking is authoritative;',
+        '- The setups screener is a deterministic rules engine. Its ranking is authoritative;',
         '  do not re-rank or second-guess it with your own scoring.',
         '- Stock price history comes from an unofficial free source and can be unavailable.',
         '- Crypto data is from CoinGecko and may be rate limited.',

@@ -9,7 +9,7 @@ import {
     CRYPTO_TOP_STORIES_WIDGET_CONFIG,
 } from "@/lib/constants";
 import { getCryptoMarkets, searchCrypto } from "@/lib/actions/crypto.actions";
-import MustBuySection from "@/components/screener/MustBuySection";
+import SetupsSection from "@/components/screener/SetupsSection";
 import AskAiButton from "@/components/assistant/AskAiButton";
 
 interface CryptoDashboardProps {
@@ -63,6 +63,7 @@ export default async function CryptoDashboard({ searchParams }: CryptoDashboardP
                         renderAs="button"
                         label="Search"
                         initialCoins={topCoins}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-gray-800 px-2.5 py-1.5 text-[11px] text-gray-300 transition-colors hover:bg-white/5"
                     />
                 </div>
             </header>
@@ -99,7 +100,7 @@ export default async function CryptoDashboard({ searchParams }: CryptoDashboardP
                     <TopCoinsTable coins={markets} />
                 </div>
                 <div className="h-full min-h-0">
-                    <MustBuySection assetType="crypto" strategyId={strategy} />
+                    <SetupsSection assetType="crypto" strategyId={strategy} />
                 </div>
                 <div className="h-full min-h-0">
                     <TradingViewWidget

@@ -13,7 +13,7 @@ interface ChatPanelProps {
 }
 
 const SUGGESTIONS = [
-    'What does the Must Buy screener flag today for stocks and crypto?',
+    'What does the setups screener flag today for stocks and crypto?',
     'How are my holdings doing?',
     'Is bitcoin overbought right now, based on RSI and MACD?',
     'Compare the trend for AAPL and ethereum.',

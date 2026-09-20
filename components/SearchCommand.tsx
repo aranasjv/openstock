@@ -8,7 +8,7 @@ import Link from "next/link";
 import {searchStocks} from "@/lib/actions/finnhub.actions";
 import {useDebounce} from "@/hooks/useDebounce";
 
-export default function SearchCommand({ renderAs = 'button', label = 'Add stock', initialStocks }: SearchCommandProps) {
+export default function SearchCommand({ renderAs = 'button', label = 'Add stock', initialStocks, className }: SearchCommandProps & { className?: string }) {
     const [open, setOpen] = useState(false)
     const [searchTerm, setSearchTerm] = useState("")
     const [loading, setLoading] = useState(false)
@@ -65,7 +65,7 @@ export default function SearchCommand({ renderAs = 'button', label = 'Add stock'
                     {label}
                 </button>
             ): (
-                <Button onClick={() => setOpen(true)} className="search-btn">
+                <Button onClick={() => setOpen(true)} className={className ?? "search-btn"}>
                     {label}
                 </Button>
             )}

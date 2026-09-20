@@ -12,12 +12,19 @@ interface CryptoSearchCommandProps {
     renderAs?: 'button' | 'text';
     label?: string;
     initialCoins: CryptoCoinWithWatchlistStatus[];
+    /**
+     * Overrides the button styling. The default `.search-btn` is a large solid button sized for
+     * the mobile nav; the dashboards pass a compact chip so it matches the "Ask AI" control it
+     * sits beside, rather than being the loudest thing in the header.
+     */
+    className?: string;
 }
 
 export default function CryptoSearchCommand({
     renderAs = 'button',
     label = 'Add crypto',
     initialCoins,
+    className,
 }: CryptoSearchCommandProps) {
     const [open, setOpen] = useState(false)
     const [searchTerm, setSearchTerm] = useState("")
@@ -76,7 +83,7 @@ export default function CryptoSearchCommand({
                     {label}
                 </button>
             ) : (
-                <Button onClick={() => setOpen(true)} className="search-btn">
+                <Button onClick={() => setOpen(true)} className={className ?? "search-btn"}>
                     {label}
                 </Button>
             )}

@@ -17,7 +17,7 @@ import { getCachedScreener, setCachedScreener } from '@/lib/screener-cache';
 import type { AIProviderName } from '@/lib/ai-provider';
 
 /**
- * The "Must Buy" screener.
+ * The screener.
  *
  * Two data paths with very different reliability:
  *   - Crypto  -> CoinGecko market_chart. Official, free, stable.
@@ -172,13 +172,22 @@ async function runScreenerUncached(
 ): Promise<ScreenerResult> {
     const strategies = STRATEGIES.map(({ id, name, summary }) => ({ id, name, summary }));
 
-    const universeSize = await getConfigNumber('SCREENER_UNIVERSE_SIZE', 12);
+    // One setting per market. A crypto scan is a history request per coin, while the stock list is
+    // a fixed curated set, so the two have no reason to share a number — and the defaults differ
+    // by an order of magnitude.
+    const universeSize =
+        assetType === 'crypto'
+            ? await getConfigNumber('CRYPTO_SCREENER_UNIVERSE_SIZE', 100)
+            : await getConfigNumber('SCREENER_UNIVERSE_SIZE', 12);
 
     // Build the universe: crypto by market cap, stocks from the curated popular list.
     const universe: { symbol: string; name: string; price: number; changePercent24h: number | null }[] = [];
 
     if (assetType === 'crypto') {
-        const markets = await getCryptoMarkets(Math.min(universeSize, 50));
+        // CoinGecko caps `per_page` at 250. The 50 that used to be here was a ceiling from when
+        // the universe was a dozen coins and was never meant to be a limit — it silently ignored
+        // any larger setting.
+        const markets = await getCryptoMarkets(Math.min(universeSize, 250));
         for (const coin of markets.slice(0, universeSize)) {
             universe.push({
                 symbol: coin.id,
@@ -266,7 +275,7 @@ async function runScreenerUncached(
 }
 
 /**
- * Run the Must Buy screener, memoised for SCREENER_CACHE_SECONDS.
+ * Run the screener, memoised for SCREENER_CACHE_SECONDS.
  *
  * Only non-empty results are cached. A fully-degraded scan (every symbol unavailable, which
  * is what a burst of rate limiting looks like) is deliberately not cached — pinning that

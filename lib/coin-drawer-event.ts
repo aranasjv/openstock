@@ -7,7 +7,7 @@
  * transform JSX, so importing a .tsx module from a test fails to parse).
  *
  * The drawer is opened by event rather than by threading a setter, because the places that
- * list coins — the Top Coins table, the Must Buy rows, the sidebar — are server components or
+ * list coins — the Top Coins table, the Setups rows, the sidebar — are server components or
  * live in unrelated client trees.
  */
 

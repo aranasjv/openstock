@@ -1,6 +1,8 @@
 import AskAiButton from "@/components/assistant/AskAiButton";
+import SearchCommand from "@/components/SearchCommand";
+import { searchStocks } from "@/lib/actions/finnhub.actions";
 import TradingViewWidget from "@/components/TradingViewWidget";
-import MustBuySection from "@/components/screener/MustBuySection";
+import SetupsSection from "@/components/screener/SetupsSection";
 import {
     HEATMAP_WIDGET_CONFIG,
     MARKET_DATA_WIDGET_CONFIG,
@@ -26,6 +28,16 @@ const Home = async ({ searchParams }: HomeProps) => {
     const { strategy } = await searchParams;
     const scriptUrl = `https://s3.tradingview.com/external-embedding/embed-widget-`;
 
+    // Seeds the search palette so it opens with something useful instead of an empty list. One
+    // fetch on one page, behind a control the user came here to use — unlike the sidebar's copy,
+    // which paid for it on every page in the app.
+    const initialStocks = await searchStocks();
+
+    // The header chip dimensions are shared with "Ask AI" so the two read as one row of controls
+    // rather than one small link and one large button.
+    const headerChip =
+        'inline-flex items-center gap-1.5 rounded-md border border-gray-800 px-2.5 py-1.5 text-[11px] text-gray-300 transition-colors hover:bg-white/5';
+
     return (
         // No outer padding: the panels sit flush against the sidebar and viewport edges so the
         // dashboard uses the full area. A small gap still separates panels from each other.
@@ -38,10 +50,18 @@ const Home = async ({ searchParams }: HomeProps) => {
                         Stocks
                     </h1>
                     <span className="text-[11px] text-gray-500">
-                        Live indices, heatmap and the Must Buy screen
+                        Live indices, heatmap and the setups screen
                     </span>
                 </div>
-                <AskAiButton />
+                <div className="flex shrink-0 items-center gap-2">
+                    <AskAiButton />
+                    <SearchCommand
+                        renderAs="button"
+                        label="Search"
+                        initialStocks={initialStocks}
+                        className={headerChip}
+                    />
+                </div>
             </header>
 
             <section className="grid shrink-0 gap-2 xl:grid-cols-3">
@@ -70,7 +90,7 @@ const Home = async ({ searchParams }: HomeProps) => {
                 of the row by default — the table is the content, the headlines are secondary. */}
             <section className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[1.9fr_1fr]">
                 <div className="h-full min-h-0">
-                    <MustBuySection assetType="stock" strategyId={strategy} />
+                    <SetupsSection assetType="stock" strategyId={strategy} />
                 </div>
                 <div className="h-full min-h-0">
                     <TradingViewWidget

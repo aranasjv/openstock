@@ -334,9 +334,19 @@ export const CONFIG_SCHEMA: SettingDef[] = [
         key: 'SCREENER_UNIVERSE_SIZE',
         group: 'screener',
         env: ['SCREENER_UNIVERSE_SIZE'],
-        label: 'Assets scanned per market',
-        description: 'How many symbols the Must Buy screener evaluates. Each one costs a history request.',
+        label: 'Stocks scanned',
+        description: 'How many stocks the screener evaluates. Each one costs a history request.',
         default: '12',
+        type: 'number',
+    },
+    {
+        key: 'CRYPTO_SCREENER_UNIVERSE_SIZE',
+        group: 'screener',
+        env: ['CRYPTO_SCREENER_UNIVERSE_SIZE'],
+        label: 'Crypto assets scanned',
+        description:
+            'How many coins by market cap the crypto screener evaluates. Each uncached coin costs one CoinGecko history request, and the Demo plan allows roughly 30 a minute — so a 100-coin scan fills in over a few runs rather than one, and stays warm afterwards for the screener cache window. Cached history is free, so each run only spends quota on coins it has not seen.',
+        default: '100',
         type: 'number',
     },
     {

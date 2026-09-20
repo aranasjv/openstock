@@ -267,7 +267,7 @@ export const AI_TOOLS: AITool[] = [
         spec: {
             name: 'run_screener',
             description:
-                'Run the Must Buy screener for one market and return the ranked candidates with their score and which conditions passed. This is deterministic — you are reporting its output, not producing your own ranking.',
+                'Run the setups screener for one market and return the ranked candidates with their score and which conditions passed. This is deterministic — you are reporting its output, not producing your own ranking.',
             parameters: {
                 type: 'object',
                 properties: {

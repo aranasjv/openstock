@@ -99,7 +99,7 @@ with a warning.
 
 ```
 app/(root)/            dashboards + detail pages. All are dynamic (searchParams/headers).
-  page.tsx             stock dashboard (widgets + Must Buy screener)
+  page.tsx             stock dashboard (widgets + Setups screener)
   crypto/page.tsx      crypto dashboard
   assistant/page.tsx   AI assistant (conversations + chat)
   stocks/[symbol]/     stock detail

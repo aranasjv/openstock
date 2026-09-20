@@ -5,25 +5,27 @@ import CandidateRow from './CandidateRow';
 import { runScreener } from '@/lib/actions/screener.actions';
 import { DEFAULT_STRATEGY_ID } from '@/lib/strategies';
 
-interface MustBuySectionProps {
+interface SetupsSectionProps {
     assetType: 'stock' | 'crypto';
     /** Raw `?strategy=` value from the URL, validated inside the action. */
     strategyId?: string;
 }
 
 /**
- * "Must Buy" screener.
+ * The screener — ranked setups for one market.
  *
- * The label is descriptive of the screen, not a recommendation: results show which assets
- * currently match a set of technical conditions, with every condition and its measured
- * value visible so the ranking can be audited rather than trusted blindly.
+ * Called "Setups" rather than "Must Buy". A setup is a set of conditions that currently hold;
+ * "Must Buy" was a recommendation, and this app disclaims recommendations in the same panel.
+ * Naming it after the promise rather than the method undercuts the disclaimer next to it.
+ *
+ * Everything the ranking rests on stays visible — each condition and its measured value — so it
+ * can be audited rather than trusted.
  */
-export default async function MustBuySection({ assetType, strategyId }: MustBuySectionProps) {
+export default async function SetupsSection({ assetType, strategyId }: SetupsSectionProps) {
     const result = await runScreener(assetType, strategyId);
     const selected = strategyId ?? DEFAULT_STRATEGY_ID;
 
-    // Show only assets that actually match something; a 0/3 row is noise in a
-    // "must buy" list.
+    // Show only assets that match something; a 0/3 row is noise in a ranked list.
     const ranked = result.candidates.filter((candidate) => candidate.matched > 0);
     const strongCount = ranked.filter((candidate) => candidate.tier === 'Strong').length;
 
@@ -32,7 +34,7 @@ export default async function MustBuySection({ assetType, strategyId }: MustBuyS
             <div className="shrink-0 space-y-2.5 border-b border-gray-800 p-3">
                 <div className="flex items-center justify-between gap-3">
                     <h2 className="text-sm font-semibold text-white">
-                        Must Buy
+                        Setups
                         <span className="ml-2 text-xs font-normal text-gray-500">
                             {assetType === 'crypto' ? 'crypto' : 'stocks'}
                         </span>
