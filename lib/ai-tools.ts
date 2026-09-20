@@ -1,6 +1,7 @@
 import 'server-only';
 
 import type { AIToolSpec } from '@/lib/ai-provider';
+import type { StrategyId } from '@/lib/strategies';
 
 /**
  * Tools the assistant can call.
@@ -640,6 +641,74 @@ export const AI_TOOLS: AITool[] = [
                     decision.recommendation === 'TRADING_ALLOWED'
                         ? "New entries are permitted. Report that as the account's current state; it is not a recommendation to buy."
                         : "New entries are blocked by the account's own risk rules. State which rule triggered and when it lifts rather than proposing a position.",
+            };
+        },
+    },
+    {
+        spec: {
+            name: 'run_backtest',
+            description:
+                'Backtest one screener strategy over historical bars and return its metrics with a Deploy/Refine/Abandon verdict. Use it whenever a strategy is being judged: the strategies are deterministic, so their historical behaviour can be measured rather than asserted. It replays the same code the screener runs, so the result describes this app rather than an approximation of it.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    symbol: {
+                        type: 'string',
+                        description: 'Ticker for a stock; the CoinGecko id for crypto (e.g. "bitcoin").',
+                    },
+                    asset_type: { type: 'string', description: '"stock" (default) or "crypto".' },
+                    strategy: {
+                        type: 'string',
+                        description: 'Strategy id, e.g. "trend-following". Omit to use the configured default.',
+                    },
+                    horizon_days: { type: 'number', description: 'Bars held after entry. Default 20.' },
+                    slippage_pct: { type: 'number', description: 'Per-side friction in percent. Default 0.2.' },
+                },
+                required: ['symbol'],
+            },
+        },
+        execute: async (args) => {
+            const symbol = str(args, 'symbol');
+            const assetType = optionalAssetType(args) ?? 'stock';
+            const requested = typeof args.strategy === 'string' && args.strategy.trim() ? args.strategy.trim() : undefined;
+
+            const [{ runBacktest }, { STRATEGIES, DEFAULT_STRATEGY_ID }, { getCryptoPriceHistory }, { getStockPriceHistory }] =
+                await Promise.all([
+                    import('@/lib/backtest'),
+                    import('@/lib/strategies'),
+                    import('@/lib/actions/crypto.actions'),
+                    import('@/lib/actions/screener.actions'),
+                ]);
+
+            // Resolved explicitly rather than left to `runStrategy`, which silently falls back to the
+            // first strategy for an unknown id — a wrong answer that looks like a right one. The cast
+            // is sound because an unrecognised id throws before it reaches the engine.
+            const strategyId = (requested ?? DEFAULT_STRATEGY_ID) as StrategyId;
+            if (!STRATEGIES.some((strategy) => strategy.id === strategyId)) {
+                throw new Error(
+                    `Unknown strategy "${strategyId}". Available: ${STRATEGIES.map((s) => s.id).join(', ')}.`
+                );
+            }
+
+            // Stocks get ten years; CoinGecko's tier caps daily history at one, which the verdict
+            // will flag rather than hide.
+            const bars =
+                assetType === 'crypto'
+                    ? await getCryptoPriceHistory(symbol.toLowerCase(), 365)
+                    : await getStockPriceHistory(symbol.toUpperCase(), '10y');
+
+            if (!bars || bars.length === 0) {
+                throw new Error(`No price history available for ${symbol}.`);
+            }
+
+            const result = runBacktest(bars, strategyId, {
+                horizonDays: typeof args.horizon_days === 'number' ? args.horizon_days : undefined,
+                slippagePct: typeof args.slippage_pct === 'number' ? args.slippage_pct : undefined,
+            });
+
+            return {
+                ...result,
+                note: 'Historical replay of this app\'s own strategy code, with slippage on both sides. Report the red flags alongside the verdict: a REFINE with none still means the strategy was never stress tested, and this tool does not run a parameter sweep. Never present a backtest as evidence a strategy will work.',
             };
         },
     },

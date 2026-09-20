@@ -51,7 +51,7 @@ vi.mock('@/lib/actions/finnhub.actions', () => ({
 }));
 vi.mock('@/lib/actions/screener.actions', () => ({
     runScreener: (assetType: string, strategy?: string) => runScreener(assetType, strategy),
-    getStockPriceHistory: (symbol: string) => getStockPriceHistory(symbol),
+    getStockPriceHistory: (symbol: string, range?: string) => getStockPriceHistory(symbol, range),
 }));
 vi.mock('@/lib/indicators', () => ({
     computeIndicators: (candles: unknown) => computeIndicators(candles),
@@ -85,9 +85,9 @@ beforeEach(() => {
 });
 
 describe('tool registry shape', () => {
-    it('exposes fourteen tools', () => {
-        expect(getToolSpecs()).toHaveLength(14);
-        expect(AI_TOOLS).toHaveLength(14);
+    it('exposes fifteen tools', () => {
+        expect(getToolSpecs()).toHaveLength(15);
+        expect(AI_TOOLS).toHaveLength(15);
     });
 
     it('gives every tool a unique, non-empty name and description', () => {
@@ -479,7 +479,7 @@ describe('get_benchmark', () => {
             indicators: { change30d: number };
         };
 
-        expect(getStockPriceHistory).toHaveBeenCalledWith('SPY');
+        expect(getStockPriceHistory).toHaveBeenCalledWith('SPY', undefined);
         expect(result.market).toBe('stocks');
         expect(result.indicators.change30d).toBe(9.1);
         expect(getCryptoPriceHistory).not.toHaveBeenCalled();
@@ -621,5 +621,70 @@ describe('get_circuit_breaker', () => {
 
         // "Allowed" is the account's state, not advice. Left unstated, a model reliably upgrades it.
         expect(result.note).toMatch(/not a recommendation/i);
+    });
+});
+
+describe('run_backtest', () => {
+    const series = (count: number) =>
+        Array.from({ length: count }, (_, i) => ({
+            t: 1_600_000_000_000 + i * 86_400_000,
+            o: 100 + i / 3,
+            h: 100 + i / 3,
+            l: 100 + i / 3,
+            c: 100 + i / 3,
+            v: 1_000_000,
+        }));
+
+    // `computeIndicators` is mocked in this file, so the engine would otherwise receive undefined for
+    // every bar and correctly report no trades. This bundle satisfies trend-following's three
+    // criteria, which is all these tests need — the engine's own maths is covered in backtest.test.ts.
+    const bundle = { price: 200, sma50: 150, sma200: 100, sma200Prior: 95, change30d: 10 };
+
+    it('refuses an unknown strategy instead of silently using the default', async () => {
+        getStockPriceHistory.mockResolvedValue(series(400));
+        computeIndicators.mockReturnValue(bundle);
+        const tool = getTool('run_backtest')!;
+
+        // runStrategy falls back to the first strategy for an unrecognised id, which would return a
+        // confident result for a strategy the caller never asked for.
+        await expect(tool.execute({ symbol: 'AAPL', strategy: 'sure-thing' }, { userId: 'u' })).rejects.toThrow(
+            /Unknown strategy/
+        );
+    });
+
+    it('fails loudly when there is no history to test against', async () => {
+        getStockPriceHistory.mockResolvedValue(null);
+        const tool = getTool('run_backtest')!;
+
+        await expect(tool.execute({ symbol: 'AAPL' }, { userId: 'u' })).rejects.toThrow(/No price history/);
+    });
+
+    it('asks Yahoo for a decade, not the screener\u2019s single year', async () => {
+        getStockPriceHistory.mockResolvedValue(series(400));
+        computeIndicators.mockReturnValue(bundle);
+        const tool = getTool('run_backtest')!;
+
+        await tool.execute({ symbol: 'aapl' }, { userId: 'u' });
+
+        expect(getStockPriceHistory).toHaveBeenCalledWith('AAPL', '10y');
+    });
+
+    it('reports the verdict together with the reason not to trust it', async () => {
+        getStockPriceHistory.mockResolvedValue(series(400));
+        computeIndicators.mockReturnValue(bundle);
+        const tool = getTool('run_backtest')!;
+
+        const result = (await tool.execute({ symbol: 'AAPL', strategy: 'trend-following' }, { userId: 'u' })) as {
+            metrics: { trades: number };
+            verdict: string;
+            redFlags: string[];
+            note: string;
+        };
+
+        expect(result.metrics.trades).toBeGreaterThan(0);
+        // Without a parameter sweep no run can deploy, however clean the metrics look.
+        expect(result.verdict).not.toBe('DEPLOY');
+        expect(result.redFlags.length).toBeGreaterThan(0);
+        expect(result.note).toMatch(/never present a backtest as evidence/i);
     });
 });

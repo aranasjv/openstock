@@ -100,27 +100,42 @@ export interface ScreenerResult {
 }
 
 /**
+ * Yahoo chart ranges, validated because the value is interpolated into a URL — even though only this
+ * app supplies it, a range arriving from a tool argument is not something to trust blindly.
+ */
+const HISTORY_RANGES = new Set(['1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'max']);
+
+function safeRange(range: string): string {
+    return HISTORY_RANGES.has(range) ? range : '1y';
+}
+
+/**
  * Fetch daily candles from Yahoo's unofficial chart endpoint.
  * Exported so the AI tool layer can compute indicators for a single stock without
  * re-running the whole screener.
+ *
+ * `range` is a parameter for the backtester, which needs years rather than the screener's one: a
+ * strategy cannot be assessed on 252 bars, and the engine needs 240 before it can evaluate even one.
+ * A longer range caches for a day, because a settled past does not change.
  */
-export async function getStockPriceHistory(symbol: string): Promise<Candle[] | null> {
+export async function getStockPriceHistory(symbol: string, range = '1y'): Promise<Candle[] | null> {
     const config = await loadConfig();
     const baseUrl = (config.YAHOO_CHART_BASE_URL || DEFAULT_YAHOO_CHART_BASE).replace(/\/$/, '');
+    const span = safeRange(range);
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
     try {
         const res = await fetch(
-            `${baseUrl}/${encodeURIComponent(symbol)}?range=1y&interval=1d`,
+            `${baseUrl}/${encodeURIComponent(symbol)}?range=${span}&interval=1d`,
             {
                 headers: {
                     // Yahoo rejects requests without a browser-like agent.
                     'user-agent': 'Mozilla/5.0 (compatible; OpenStock/1.0)',
                     accept: 'application/json',
                 },
-                next: { revalidate: 3600 },
+                next: { revalidate: span === '1y' ? 3600 : 86_400 },
                 signal: controller.signal,
             }
         );
