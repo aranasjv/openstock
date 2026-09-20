@@ -1,4 +1,6 @@
+import PseFilterBar from '@/components/ph/PseFilterBar';
 import { fetchPseMarket } from '@/lib/phisix';
+import { filterPseQuotes, type PseFilter } from '@/lib/pse-filter';
 
 /**
  * The PSE market table.
@@ -22,8 +24,12 @@ const PESO = new Intl.NumberFormat('en-PH', {
 
 const COMPACT = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 });
 
-export default async function PseMarketTable() {
+export default async function PseMarketTable({ filter }: { filter?: PseFilter }) {
     const market = await fetchPseMarket();
+
+    // The filter is applied here rather than in the component that owns the form, so the table and the
+    // "N of M match" count can never disagree about what is being shown.
+    const quotes = market ? (filter ? filterPseQuotes(market.quotes, filter) : market.quotes) : [];
 
     if (!market) {
         return (
@@ -44,6 +50,10 @@ export default async function PseMarketTable() {
                 <span className="text-[10px] uppercase tracking-wider text-gray-500">
                     {market.quotes.length} common · {market.excluded} pref/warrant
                 </span>
+            </div>
+
+            <div className="mb-2 shrink-0">
+                <PseFilterBar matched={quotes.length} total={market.quotes.length} />
             </div>
 
             {market.stale ? (
@@ -74,7 +84,7 @@ export default async function PseMarketTable() {
                         </tr>
                     </thead>
                     <tbody>
-                        {market.quotes.map((quote) => (
+                        {quotes.map((quote) => (
                             <tr key={quote.symbol} className="border-t border-gray-800/50">
                                 <td className="py-1 font-mono text-gray-200">{quote.symbol}</td>
                                 <td className="max-w-[12rem] truncate py-1 text-gray-400" title={quote.name}>
@@ -104,6 +114,13 @@ export default async function PseMarketTable() {
                         ))}
                     </tbody>
                 </table>
+
+                {quotes.length === 0 ? (
+                    <p className="py-3 text-[11px] text-gray-500">
+                        Nothing matches this filter. Widen it, or check the tickers — the list is the
+                        feed&apos;s, so a symbol it does not carry cannot match.
+                    </p>
+                ) : null}
             </div>
         </section>
     );

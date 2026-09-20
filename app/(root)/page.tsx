@@ -9,6 +9,7 @@ import { searchStocks } from "@/lib/actions/finnhub.actions";
 import TradingViewWidget from "@/components/TradingViewWidget";
 import SetupsSection from "@/components/screener/SetupsSection";
 import { parseMarket } from "@/lib/markets";
+import { parsePseFilter } from "@/lib/pse-filter";
 import {
     HEATMAP_WIDGET_CONFIG,
     MARKET_DATA_WIDGET_CONFIG,
@@ -17,7 +18,9 @@ import {
 } from "@/lib/constants";
 
 interface HomeProps {
-    searchParams: Promise<{ strategy?: string; market?: string }>;
+    // A broad record rather than named fields: this page reads the market, the screener strategy and
+    // the filter parameters, and enumerating them had already drifted behind the code once.
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 /**
@@ -42,8 +45,13 @@ interface HomeProps {
 const WIDGET_HEIGHT = 280;
 
 const Home = async ({ searchParams }: HomeProps) => {
-    const { strategy, market: marketParam } = await searchParams;
-    const market = parseMarket(marketParam);
+    const params = await searchParams;
+    const market = parseMarket(typeof params.market === "string" ? params.market : undefined);
+    const strategy = typeof params.strategy === "string" ? params.strategy : undefined;
+
+    // Parsed from the same parameters the filter form writes, so the table and the form cannot
+    // disagree about what is being shown.
+    const pseFilter = parsePseFilter(params);
     const scriptUrl = `https://s3.tradingview.com/external-embedding/embed-widget-`;
 
     // Only the US palette is pre-fetched. The PSE panels read the feed themselves and share the same
@@ -140,7 +148,7 @@ const Home = async ({ searchParams }: HomeProps) => {
                         rather than scrolling inside it, so the dashboard ran past the fold. */}
                     <section className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[1fr_1.6fr]">
                         <PseMovers />
-                        <PseMarketTable />
+                        <PseMarketTable filter={pseFilter} />
                     </section>
 
                     <section className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[1.9fr_1fr]">
