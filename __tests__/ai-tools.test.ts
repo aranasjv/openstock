@@ -22,6 +22,10 @@ const getCompanyProfile = vi.fn();
 const getCryptoNews = vi.fn();
 const getNews = vi.fn();
 const runScreener = vi.fn();
+const getEarningsCalendar = vi.fn();
+const getStockPriceHistory = vi.fn();
+const getCryptoPriceHistory = vi.fn();
+const computeIndicators = vi.fn();
 
 // The personal tools go through the data layer, not the server actions: an action resolves a
 // session, and a tool call already has an authenticated userId from its own caller.
@@ -35,16 +39,22 @@ vi.mock('@/lib/actions/crypto.actions', () => ({
     getCryptoMarkets: (limit: number) => getCryptoMarkets(limit),
     getCryptoCoinDetail: (id: string) => getCryptoCoinDetail(id),
     getCryptoNews: () => getCryptoNews(),
+    getCryptoPriceHistory: (id: string) => getCryptoPriceHistory(id),
     searchCrypto: (query: string) => searchCrypto(query),
 }));
 vi.mock('@/lib/actions/finnhub.actions', () => ({
     getQuote: (symbol: string) => getQuote(symbol),
     getCompanyProfile: (symbol: string) => getCompanyProfile(symbol),
     getNews: () => getNews(),
+    getEarningsCalendar: (symbol: string) => getEarningsCalendar(symbol),
     searchStocks: async () => [],
 }));
 vi.mock('@/lib/actions/screener.actions', () => ({
     runScreener: (assetType: string, strategy?: string) => runScreener(assetType, strategy),
+    getStockPriceHistory: (symbol: string) => getStockPriceHistory(symbol),
+}));
+vi.mock('@/lib/indicators', () => ({
+    computeIndicators: (candles: unknown) => computeIndicators(candles),
 }));
 
 const loadAnalysisSkill = vi.fn();
@@ -70,9 +80,9 @@ beforeEach(() => {
 });
 
 describe('tool registry shape', () => {
-    it('exposes ten tools', () => {
-        expect(getToolSpecs()).toHaveLength(10);
-        expect(AI_TOOLS).toHaveLength(10);
+    it('exposes twelve tools', () => {
+        expect(getToolSpecs()).toHaveLength(12);
+        expect(AI_TOOLS).toHaveLength(12);
     });
 
     it('gives every tool a unique, non-empty name and description', () => {
@@ -378,5 +388,123 @@ describe('get_analysis_playbook', () => {
         )) as { playbook: string };
 
         expect(result.playbook).toBe('methodologies');
+    });
+});
+
+describe('get_earnings_calendar', () => {
+    const inDays = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+
+    it('reports the next date, how far away it is, and that it is imminent', async () => {
+        getEarningsCalendar.mockResolvedValue([
+            { date: inDays(-3), epsActual: 1.2 },
+            { date: inDays(2), hour: 'amc', epsEstimate: 1.5 },
+            { date: inDays(30), hour: 'bmo', epsEstimate: 1.8 },
+        ]);
+
+        const tool = getTool('get_earnings_calendar')!;
+        const result = (await tool.execute({ symbol: 'aapl' }, { userId: 'u' })) as {
+            symbol: string;
+            nextEarnings: { daysAway: number; hour: string } | null;
+            imminent: boolean;
+            recent: unknown[];
+        };
+
+        expect(getEarningsCalendar).toHaveBeenCalledWith('AAPL');
+        expect(result.symbol).toBe('AAPL');
+        expect(result.nextEarnings?.daysAway).toBe(2);
+        expect(result.nextEarnings?.hour).toBe('amc');
+        expect(result.imminent).toBe(true);
+        // Past events are kept separately so the gate does not confuse the two.
+        expect(result.recent).toHaveLength(1);
+    });
+
+    it('does not call a distant date imminent', async () => {
+        getEarningsCalendar.mockResolvedValue([{ date: inDays(30), epsEstimate: 1.8 }]);
+
+        const tool = getTool('get_earnings_calendar')!;
+        const result = (await tool.execute({ symbol: 'AAPL' }, { userId: 'u' })) as {
+            imminent: boolean;
+        };
+
+        expect(result.imminent).toBe(false);
+    });
+
+    it('distinguishes a provider failure from having no dates', async () => {
+        // null is a failed lookup; [] is "the provider has nothing". Conflating them would let
+        // an outage read as "no event risk", which is the one wrong answer here.
+        getEarningsCalendar.mockResolvedValue(null);
+
+        const tool = getTool('get_earnings_calendar')!;
+        await expect(tool.execute({ symbol: 'AAPL' }, { userId: 'u' })).rejects.toThrow(
+            /Could not load the earnings calendar/
+        );
+    });
+
+    it('says an absent date is unknown, not clear', async () => {
+        getEarningsCalendar.mockResolvedValue([]);
+
+        const tool = getTool('get_earnings_calendar')!;
+        const result = (await tool.execute({ symbol: 'AAPL' }, { userId: 'u' })) as {
+            nextEarnings: null;
+            imminent: boolean;
+            note: string;
+        };
+
+        expect(result.nextEarnings).toBeNull();
+        expect(result.imminent).toBe(false);
+        expect(result.note).toMatch(/absence of data/i);
+    });
+
+    it('requires a symbol', async () => {
+        const tool = getTool('get_earnings_calendar')!;
+        await expect(tool.execute({}, { userId: 'u' })).rejects.toThrow('"symbol" is required');
+    });
+});
+
+describe('get_benchmark', () => {
+    const candle = { time: 1, open: 1, high: 1, low: 1, close: 1, volume: 1 };
+
+    it('uses SPY for stocks and passes its indicators through', async () => {
+        getStockPriceHistory.mockResolvedValue([candle]);
+        computeIndicators.mockReturnValue({ change30d: 9.1, sma200: 500 });
+
+        const tool = getTool('get_benchmark')!;
+        const result = (await tool.execute({}, { userId: 'u' })) as {
+            market: string;
+            indicators: { change30d: number };
+        };
+
+        expect(getStockPriceHistory).toHaveBeenCalledWith('SPY');
+        expect(result.market).toBe('stocks');
+        expect(result.indicators.change30d).toBe(9.1);
+        expect(getCryptoPriceHistory).not.toHaveBeenCalled();
+    });
+
+    it('uses Bitcoin for crypto', async () => {
+        getCryptoPriceHistory.mockResolvedValue([candle]);
+        computeIndicators.mockReturnValue({ change30d: -4 });
+
+        const tool = getTool('get_benchmark')!;
+        const result = (await tool.execute({ market: 'crypto' }, { userId: 'u' })) as {
+            benchmark: string;
+        };
+
+        expect(getCryptoPriceHistory).toHaveBeenCalledWith('bitcoin');
+        expect(result.benchmark).toContain('Bitcoin');
+    });
+
+    it('fails loudly when the benchmark history is unavailable', async () => {
+        getStockPriceHistory.mockResolvedValue(null);
+
+        const tool = getTool('get_benchmark')!;
+        await expect(tool.execute({}, { userId: 'u' })).rejects.toThrow(/Could not load/);
+    });
+
+    it('fails loudly when there is too little history to compute indicators', async () => {
+        getStockPriceHistory.mockResolvedValue([candle]);
+        computeIndicators.mockReturnValue(null);
+
+        const tool = getTool('get_benchmark')!;
+        await expect(tool.execute({}, { userId: 'u' })).rejects.toThrow(/too little history/);
     });
 });

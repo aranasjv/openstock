@@ -318,6 +318,8 @@ Map the inputs like this:
   average volume, 5d/30d change, max drawdown, volatility)
 - screening → \`run_screener\` — its ranking is deterministic; report it, never re-score it
 - news → \`get_market_news\`
+- event risk (is there a binary event close?) → \`get_earnings_calendar\`
+- market context and relative strength → \`get_benchmark\`
 - the user's own book → \`get_my_holdings\`, \`get_my_watchlist\`
 
 If the method needs an input none of those provide, name the missing input and what it would
@@ -330,7 +332,7 @@ const NO_FUNDAMENTALS = `Fundamentals note: OpenStock fetches quotes, profiles a
 
 const NO_TRADE_STORE = `Storage note: OpenStock keeps no trade or thesis records yet. Everything this playbook reads from \`state/\` — open theses, the realised P&L ledger, MAE/MFE, the running win/loss count — is unavailable. Name which of those inputs a step needs, then stop. If the user supplies their own trades, apply the method to those instead.`;
 
-const NO_EARNINGS = `Earnings note: the Finnhub earnings calendar is not wired up here yet, so an imminent binary event cannot be detected. Treat "next earnings" as unknown and say so rather than estimating a date.`;
+const EARNINGS_WIRED = `Earnings note: \`get_earnings_calendar\` is wired to Finnhub, so event risk is a real input here — call it rather than guessing a date. Anything inside a week is binary. A symbol with no date on record is "unknown", never "clear".`;
 
 const NO_MACRO = `Macro note: OpenStock has no rates, FX or commodity feed, so the playbook's macro inputs are unavailable and a full environment read is not possible. Describe the equity and crypto picture, list the macro inputs you would need, and stop there.`;
 
@@ -350,8 +352,8 @@ const PLAYBOOK_NOTES: Record<string, string> = {
     'uptrend-analyzer': NO_BREADTH_SERIES,
     'exposure-coach': `${NO_BREADTH_SERIES} It also consumes the uptrend series, which is likewise unavailable, so an exposure ceiling built on proxies must be presented as provisional.`,
     'crypto-regime-analyzer': CRYPTO_REGIME_NOTE,
-    'earnings-calendar': NO_EARNINGS,
-    'pre-trade-discipline-gate': `${NO_TRADE_STORE} The event-risk check is also unavailable — there is no earnings feed.`,
+    'earnings-calendar': EARNINGS_WIRED,
+    'pre-trade-discipline-gate': `${NO_TRADE_STORE} The event-risk item *is* available: call \`get_earnings_calendar\` and treat anything inside a week as a reason to wait.`,
     'position-sizer': SIZER_NOTE,
     'breakout-trade-planner': SIZER_NOTE,
     'backtest-expert': BACKTEST_NOTE,

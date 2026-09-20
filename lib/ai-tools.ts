@@ -476,6 +476,104 @@ export const AI_TOOLS: AITool[] = [
             };
         },
     },
+    {
+        spec: {
+            name: 'get_earnings_calendar',
+            description:
+                'Recent and upcoming earnings dates for a stock. Use it for event risk: the earnings playbook and the pre-trade gate both treat an imminent binary event as a reason to wait. A null nextEarnings means the provider has no date on record — that is an absence, not a clearance.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    symbol: { type: 'string', description: 'Stock ticker, e.g. "AAPL".' },
+                },
+                required: ['symbol'],
+            },
+        },
+        execute: async (args) => {
+            const symbol = str(args, 'symbol').toUpperCase();
+            const { getEarningsCalendar } = await import('@/lib/actions/finnhub.actions');
+
+            const events = await getEarningsCalendar(symbol);
+            // null is a provider failure; [] is a real answer. Conflating them would let a
+            // failed lookup read as "no event risk".
+            if (events === null) throw new Error(`Could not load the earnings calendar for ${symbol}.`);
+
+            const today = new Date().toISOString().slice(0, 10);
+            const upcoming = events.filter((event) => event.date >= today);
+            const next = upcoming[0] ?? null;
+            const daysAway = next
+                ? Math.round(
+                      (Date.parse(`${next.date}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) /
+                          86_400_000
+                  )
+                : null;
+
+            return {
+                symbol,
+                nextEarnings: next
+                    ? {
+                          date: next.date,
+                          daysAway,
+                          hour: next.hour ?? 'unknown',
+                          epsEstimate: next.epsEstimate ?? null,
+                      }
+                    : null,
+                imminent: daysAway !== null && daysAway <= 7,
+                recent: events.filter((event) => event.date < today).slice(-3),
+                note: next
+                    ? `Next earnings ${next.date} (${daysAway} day(s) away). Treat anything inside a week as event risk.`
+                    : 'Finnhub has no upcoming earnings date for this symbol. That is an absence of data, not an absence of risk.',
+            };
+        },
+    },
+    {
+        spec: {
+            name: 'get_benchmark',
+            description:
+                'Indicators for the market benchmark — SPY for stocks, Bitcoin for crypto. Call it to judge an asset in context: relative strength is the asset\'s 30-day change minus this one\'s, and being up 4% means little if the benchmark is up 9%.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    market: { type: 'string', description: '"stocks" (default) or "crypto".' },
+                },
+            },
+        },
+        execute: async (args) => {
+            const market = args.market === 'crypto' ? 'crypto' : 'stocks';
+
+            const [{ getStockPriceHistory }, { getCryptoPriceHistory }, { computeIndicators }] =
+                await Promise.all([
+                    import('@/lib/actions/screener.actions'),
+                    import('@/lib/actions/crypto.actions'),
+                    import('@/lib/indicators'),
+                ]);
+
+            const benchmark =
+                market === 'crypto'
+                    ? { symbol: 'bitcoin', label: 'Bitcoin (BTC)' }
+                    : { symbol: 'SPY', label: 'S&P 500 ETF (SPY)' };
+
+            const candles =
+                market === 'crypto'
+                    ? await getCryptoPriceHistory(benchmark.symbol)
+                    : await getStockPriceHistory(benchmark.symbol);
+
+            if (!candles) throw new Error(`Could not load ${benchmark.label} price history.`);
+
+            const indicators = computeIndicators(candles);
+            if (!indicators) {
+                throw new Error(`${benchmark.label} has too little history to compute indicators.`);
+            }
+
+            return {
+                market,
+                benchmark: benchmark.label,
+                symbol: benchmark.symbol,
+                indicators,
+                note: 'Relative strength = the asset\'s change30d minus this change30d. Compare like for like: an asset\'s own 5-day move against a benchmark\'s 30-day move is not a comparison.',
+            };
+        },
+    },
 ];
 
 const TOOL_BY_NAME = new Map(AI_TOOLS.map((tool) => [tool.spec.name, tool]));

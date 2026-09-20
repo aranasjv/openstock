@@ -99,6 +99,47 @@ export async function getCompanyProfile(symbol: string) {
     }
 }
 
+export interface EarningsEvent {
+    date: string;
+    hour?: string;
+    epsEstimate?: number | null;
+    epsActual?: number | null;
+    revenueEstimate?: number | null;
+    quarter?: number;
+    year?: number;
+}
+
+interface FinnhubEarningsResponse {
+    earningsCalendar?: EarningsEvent[];
+}
+
+/**
+ * Recent and upcoming earnings dates for one symbol.
+ *
+ * Event risk was permanently "unknown" before this: `earnings-calendar` and
+ * `pre-trade-discipline-gate` both treat an imminent binary event as a reason to wait, and an
+ * unknown cannot be waited on. Finnhub's free tier covers the endpoint, so this is one call
+ * rather than a new vendor.
+ *
+ * Returns `null` on failure and `[]` when the provider simply has no dates — the caller has to
+ * be able to tell those apart, because "no earnings found" is not "safe to enter".
+ */
+export async function getEarningsCalendar(symbol: string, daysBack = 7, daysForward = 45) {
+    try {
+        const { token, baseUrl } = await getFinnhubConfig();
+        const from = new Date(Date.now() - daysBack * 86_400_000).toISOString().slice(0, 10);
+        const to = new Date(Date.now() + daysForward * 86_400_000).toISOString().slice(0, 10);
+        const url = `${baseUrl}/calendar/earnings?symbol=${encodeURIComponent(symbol)}&from=${from}&to=${to}&token=${token}`;
+
+        // Earnings dates move rarely, so an hour of cache is free accuracy.
+        const data = await fetchJSON<FinnhubEarningsResponse>(url, 3600);
+        return (data.earningsCalendar ?? []).slice().sort((a, b) => a.date.localeCompare(b.date));
+    } catch (e) {
+        console.error('Error fetching earnings calendar for', symbol, e);
+        return null;
+    }
+}
+
 export async function getWatchlistData(symbols: string[]) {
     if (!symbols || symbols.length === 0) return [];
 

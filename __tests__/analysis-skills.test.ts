@@ -234,6 +234,8 @@ describe('the playbook bridge', () => {
             expect(bridge).toContain('cannot execute anything');
             expect(bridge).toContain('get_indicators');
             expect(bridge).toContain('run_screener');
+            expect(bridge).toContain('get_earnings_calendar');
+            expect(bridge).toContain('get_benchmark');
             // The rule that matters most: a missing input is never estimated.
             expect(bridge).toMatch(/not\s+available|missing input/);
         }
@@ -257,6 +259,11 @@ describe('the playbook bridge', () => {
 
         // Sizing arithmetic must be shown, not asserted.
         expect(getPlaybookBridge('position-sizer')).toMatch(/step by step/i);
+
+        // Earnings is now a real input, so the bridge must point at the feed rather than
+        // claiming event risk is unknowable.
+        expect(getPlaybookBridge('earnings-calendar')).toContain('get_earnings_calendar');
+        expect(getPlaybookBridge('earnings-calendar')).not.toMatch(/not wired up/i);
     });
 
     it('falls back to the generic bridge for a playbook with no specific note', () => {
