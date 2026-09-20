@@ -24,6 +24,7 @@ describe('parseBreadthCsv', () => {
             bearishSignal: false,
             isPeak: false,
             isTrough: false,
+            isTrough8MaBelow04: false,
             breadth50Raw: 0.31,
             breadth50Ma: 0.53,
             breadth50MaTrend: -1,

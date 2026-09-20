@@ -24,6 +24,8 @@ export interface BreadthRow {
     bearishSignal: boolean;
     isPeak: boolean;
     isTrough: boolean;
+    /** Extreme-oversold marker: the 8MA has fallen below 0.40. Drives the C3 contrarian bonus. */
+    isTrough8MaBelow04: boolean;
     /** The same series computed on the 50-day average, used by the bearish-signal component. */
     breadth50Raw: number | null;
     breadth50Ma: number | null;
@@ -42,6 +44,7 @@ const COLUMNS = {
     bearishSignal: 'Bearish_Signal',
     isPeak: 'Is_Peak',
     isTrough: 'Is_Trough',
+    isTrough8MaBelow04: 'Is_Trough_8MA_Below_04',
     breadth50Raw: 'Breadth_50_Index_Raw',
     breadth50Ma: 'Breadth_50_Index_50MA',
     breadth50MaTrend: 'Breadth_50_MA_Trend',
@@ -70,7 +73,7 @@ const NUMERIC_FIELDS: NumericField[] = [
     'breadth50MaTrend',
 ];
 
-const BOOLEAN_FIELDS = ['bearishSignal', 'isPeak', 'isTrough', 'isPeak50', 'isTrough50'] as const;
+const BOOLEAN_FIELDS = ['bearishSignal', 'isPeak', 'isTrough', 'isTrough8MaBelow04', 'isPeak50', 'isTrough50'] as const;
 
 function toNumber(value: string | undefined): number | null {
     if (value === undefined) return null;
