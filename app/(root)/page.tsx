@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { Sparkles } from "lucide-react";
+import AskAiButton from "@/components/assistant/AskAiButton";
 import TradingViewWidget from "@/components/TradingViewWidget";
 import MustBuySection from "@/components/screener/MustBuySection";
 import {
@@ -42,13 +41,7 @@ const Home = async ({ searchParams }: HomeProps) => {
                         Live indices, heatmap and the Must Buy screen
                     </span>
                 </div>
-                <Link
-                    href="/assistant"
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-teal-900/50 bg-teal-950/30 px-2.5 py-1.5 text-[11px] text-teal-300 transition-colors hover:bg-teal-900/30"
-                >
-                    <Sparkles className="h-3 w-3" />
-                    Ask AI
-                </Link>
+                <AskAiButton />
             </header>
 
             <section className="grid shrink-0 gap-2 xl:grid-cols-3">

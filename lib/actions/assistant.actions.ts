@@ -10,6 +10,7 @@ import {
     type ConversationToolTrace,
 } from '@/database/models/conversation.model';
 import { runChatTurn } from '@/lib/ai-chat';
+import { loadConfig } from '@/lib/config';
 import { checkRateLimit } from '@/lib/rate-limit';
 
 /**
@@ -57,6 +58,58 @@ export async function listConversations(): Promise<ConversationSummary[]> {
         updatedAt: new Date(doc.updatedAt).toISOString(),
         messageCount: doc.messages?.length ?? 0,
     }));
+}
+
+export interface AssistantOverlayState {
+    conversation: ConversationDetail | null;
+    providerLabel: string;
+}
+
+/**
+ * Everything the floating assistant needs on its first open, in one round trip.
+ *
+ * A conversation is created when the user has none. The overlay is summoned by a single click
+ * on "Ask AI", so landing on an empty state with no composer would make the button look
+ * broken; the /assistant page can afford a "no conversation selected" placeholder because it
+ * also renders the list, and this cannot.
+ *
+ * The provider label travels with it so the panel can name the model that answered — the same
+ * guarantee the full page makes, and the reason it is not hard-coded here.
+ */
+export async function loadAssistantOverlayState(): Promise<AssistantOverlayState> {
+    const userId = await requireUserId();
+    await connectToDatabase();
+
+    const newest = await ConversationModel.findOne({ userId })
+        .sort({ updatedAt: -1 })
+        .select({ _id: 1 })
+        .lean();
+
+    const conversationId = newest
+        ? String(newest._id)
+        : String(
+              (
+                  await ConversationModel.create({
+                      userId,
+                      title: 'New conversation',
+                      messages: [],
+                  })
+              )._id
+          );
+
+    const conversation = await getConversation(conversationId);
+
+    const config = await loadConfig();
+    const provider = config.AI_PROVIDER || 'gemini';
+    const model =
+        provider === 'deepseek' ? config.DEEPSEEK_MODEL : provider === 'gemini' ? config.GEMINI_MODEL : null;
+    const configured =
+        provider === 'deepseek' ? config.DEEPSEEK_API_KEY : provider === 'gemini' ? config.GEMINI_API_KEY : '1';
+
+    return {
+        conversation,
+        providerLabel: configured ? `${provider}${model ? ` · ${model}` : ''}` : `${provider} · no key set`,
+    };
 }
 
 export async function getConversation(id: string): Promise<ConversationDetail | null> {
