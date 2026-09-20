@@ -10,7 +10,19 @@ interface NewsGridProps {
 }
 
 export default function NewsGrid({ news }: NewsGridProps) {
-    if (!news || news.length === 0) return null;
+    // Kept a visible state rather than returning null. An empty list and a failed fetch used to
+    // look identical — the whole section just vanished — so there was no way to tell "slow news
+    // day" from "the provider is down".
+    if (!news || news.length === 0) {
+        return (
+            <div className="mt-8">
+                <h2 className="mb-4 text-xl font-bold text-white">Market News</h2>
+                <p className="rounded-lg border border-gray-800 bg-gray-900/30 p-4 text-sm text-gray-400">
+                    No headlines available right now.
+                </p>
+            </div>
+        );
+    }
 
     return (
         <div className="mt-8">

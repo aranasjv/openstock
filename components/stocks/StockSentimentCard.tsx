@@ -35,7 +35,19 @@ function getAlignmentClasses(alignment: string): string {
 
 export default function StockSentimentCard({ insight }: StockSentimentCardProps) {
     if (!insight) {
-        return null;
+        // This used to return null, so a missing sentiment source looked like a shorter page
+        // rather than a missing panel — the user cannot tell "nothing to report" from "we could
+        // not reach it". The card keeps its footprint and says which it is.
+        return (
+            <section className="rounded-2xl border border-gray-800 bg-gray-950/40 p-5 backdrop-blur-sm">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-500">
+                    Sentiment Insights
+                </p>
+                <p className="mt-2 text-sm text-gray-400">
+                    No sentiment data for this symbol right now.
+                </p>
+            </section>
+        );
     }
 
     return (

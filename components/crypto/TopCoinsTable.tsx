@@ -85,9 +85,21 @@ export default function TopCoinsTable({ coins }: TopCoinsTableProps) {
                                                 ) : (
                                                     <div className="h-4 w-4 shrink-0 rounded-full bg-gray-800" />
                                                 )}
-                                                <span className="truncate text-xs font-medium text-gray-100">
+                                                {/* A real button rather than a key handler on the
+                                                    row: the row keeps its table semantics for
+                                                    screen readers, and this is the control a
+                                                    keyboard can actually reach. The row click stays
+                                                    as a mouse convenience. */}
+                                                <button
+                                                    type="button"
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        openCoinDrawer(coin.id);
+                                                    }}
+                                                    className="truncate rounded text-left text-xs font-medium text-gray-100 hover:text-teal-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-teal-500/60"
+                                                >
                                                     {coin.name}
-                                                </span>
+                                                </button>
                                                 <span className="shrink-0 text-[10px] text-gray-500">
                                                     {coin.symbol}
                                                 </span>
