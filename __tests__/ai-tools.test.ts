@@ -71,7 +71,7 @@ vi.mock('@/lib/analysis-skills', () => ({
 }));
 
 const getCryptoRegime = vi.fn();
-vi.mock('@/lib/actions/regime.actions', () => ({ getCryptoRegime: () => getCryptoRegime() }));
+vi.mock('@/lib/crypto-regime-live', () => ({ getCryptoRegime: () => getCryptoRegime() }));
 
 import { AI_TOOLS, getTool, getToolSpecs } from '@/lib/ai-tools';
 

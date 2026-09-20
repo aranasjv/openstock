@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getFundingRates } from '@/lib/actions/binance.actions';
+import { getFundingRates } from '@/lib/binance';
 
 /**
  * Funding feeds the leverage component of the crypto regime read, and the component is contrarian

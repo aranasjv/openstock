@@ -1,7 +1,7 @@
-'use server';
+import 'server-only';
 
 import { getCryptoMarkets, getCryptoPriceHistory } from '@/lib/actions/crypto.actions';
-import { getFundingRates } from '@/lib/actions/binance.actions';
+import { getFundingRates } from '@/lib/binance';
 import { getDominanceHistory, recordDominanceObservation } from '@/lib/data/dominance';
 import { mapWithConcurrency } from '@/lib/concurrency';
 import { scoreCryptoRegime, type CoinSeries, type RegimeResult } from '@/lib/crypto-regime';
@@ -14,6 +14,10 @@ import type { Candle } from '@/lib/indicators';
  * Keeping the two apart is what lets the model be tested against fixed snapshots while this side is
  * allowed to fail partially: every input degrades on its own, and the composite decides whether
  * enough of the model survived to say anything at all.
+ *
+ * Deliberately **not** a `'use server'` module, for the reason given in `lib/binance.ts`. One
+ * invocation is around twenty CoinGecko history calls and it is reached from a server component and
+ * a tool — never from a browser, so there is nothing to gain by exposing it and a quota to lose.
  */
 
 /** Coins considered for breadth and momentum, excluding BTC. */
@@ -50,10 +54,16 @@ function closesOf(candles: Candle[] | null): number[] {
 }
 
 export async function getCryptoRegime(): Promise<CryptoRegimeReport> {
-    // Recording first. The history can only grow one day at a time, so a read path that never
-    // recorded would leave the dominance component permanently unavailable and permanently
-    // redistributed — a component that can never turn on is worse than one that is missing.
-    await recordDominanceObservation();
+    // Recording first, but best-effort. The history can only grow one day at a time, so a read path
+    // that never recorded would leave the dominance component permanently unavailable — worse than a
+    // component that is merely missing. A failure to *record*, though, must not fail the read: the
+    // component is unavailable either way, and taking down the panel over a bookkeeping write would
+    // be the worse trade of the two.
+    try {
+        await recordDominanceObservation();
+    } catch (error) {
+        console.warn('Regime: could not record the dominance observation:', error);
+    }
 
     const [dominance, markets] = await Promise.all([
         getDominanceHistory(),

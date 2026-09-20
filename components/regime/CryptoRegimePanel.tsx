@@ -1,4 +1,4 @@
-import { getCryptoRegime } from '@/lib/actions/regime.actions';
+import { getCryptoRegime } from '@/lib/crypto-regime-live';
 
 /**
  * The crypto regime, as a strip.

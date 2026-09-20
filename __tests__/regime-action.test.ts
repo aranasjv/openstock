@@ -16,7 +16,7 @@ vi.mock('@/lib/actions/crypto.actions', () => ({
     getCryptoMarkets: (limit: number) => getCryptoMarkets(limit),
     getCryptoPriceHistory: (id: string, days?: number) => getCryptoPriceHistory(id, days),
 }));
-vi.mock('@/lib/actions/binance.actions', () => ({ getFundingRates: () => getFundingRates() }));
+vi.mock('@/lib/binance', () => ({ getFundingRates: () => getFundingRates() }));
 vi.mock('@/lib/data/dominance', () => ({
     getDominanceHistory: () => getDominanceHistory(),
     recordDominanceObservation: () => recordDominanceObservation(),
@@ -26,7 +26,7 @@ vi.mock('@/lib/crypto-regime', async (importOriginal) => {
     return { ...actual, scoreCryptoRegime: (input: unknown) => scoreCryptoRegime(input) };
 });
 
-import { getCryptoRegime } from '@/lib/actions/regime.actions';
+import { getCryptoRegime } from '@/lib/crypto-regime-live';
 
 interface EngineInput {
     btcCloses: number[];

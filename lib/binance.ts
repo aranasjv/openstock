@@ -1,4 +1,4 @@
-'use server';
+import 'server-only';
 
 import { fetchWithTimeout } from '@/lib/http';
 import { mapWithConcurrency } from '@/lib/concurrency';
@@ -14,6 +14,10 @@ import { mapWithConcurrency } from '@/lib/concurrency';
  * Keyless, but **geo-blocked in some regions**, so failure is expected rather than exceptional:
  * this returns null and the caller skips the component, rather than taking down the whole regime
  * read over one endpoint. That resilience is the reason it is not a plain fetch.
+ *
+ * Deliberately **not** a `'use server'` module. Its only callers are server-side, so marking it an
+ * action would expose it to the browser for no benefit — and one invocation is five upstream calls,
+ * which is a quota to spend at someone else's expense.
  */
 
 const BINANCE_FAPI = 'https://fapi.binance.com';

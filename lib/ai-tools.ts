@@ -582,7 +582,7 @@ export const AI_TOOLS: AITool[] = [
             parameters: { type: 'object', properties: {} },
         },
         execute: async () => {
-            const { getCryptoRegime } = await import('@/lib/actions/regime.actions');
+            const { getCryptoRegime } = await import('@/lib/crypto-regime-live');
             const report = await getCryptoRegime();
 
             const components = report.components.map((component) => ({
