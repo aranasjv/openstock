@@ -663,3 +663,58 @@ export const PASSWORD_VALIDATION = {
         message: 'Password must include uppercase, lowercase, and a number',
     },
 };
+
+// ── Philippine Stock Exchange ───────────────────────────────────────────
+//
+// TradingView namespaces non-US symbols by exchange, so every PSE symbol carries a `PSE:` prefix.
+// `PSE:PSEI` is the index itself, confirmed against TradingView's own symbol search rather than
+// inferred from the ticker — the app's other data sources cannot supply PSE at all, so if these
+// configs are wrong there is no backend result to fall back on and the panel would simply be empty.
+
+/** The PSEi composite, as a chart. */
+export const PH_INDEX_WIDGET_CONFIG = {
+    autosize: true,
+    symbol: 'PSE:PSEI',
+    interval: 'D',
+    timezone: 'Asia/Manila',
+    theme: 'dark',
+    style: '1',
+    locale: 'en',
+    // Same explicit background as every other embed: `theme` is set, but transparency is what
+    // previously produced a light surface, and there is no parent colour to rely on here.
+    backgroundColor: '#141414',
+    gridColor: 'rgba(240, 243, 250, 0)',
+    hide_side_toolbar: true,
+    allow_symbol_change: true,
+    details: false,
+    hotlist: false,
+    calendar: false,
+    studies: [],
+    watchlist: [],
+    show_popup_button: true,
+    popup_width: '1000',
+    popup_height: '650',
+    support_host: 'https://www.tradingview.com',
+};
+
+/**
+ * A PSE quote board, built from the live feed rather than a hardcoded list, so it shows what
+ * actually trades instead of what looked liquid when this file was written.
+ */
+export const phQuotesWidgetConfig = (symbols: { symbol: string; name: string }[]) => ({
+    isTransparent: false,
+    backgroundColor: '#0F0F0F',
+    width: '100%',
+    height: '100%',
+    locale: 'en',
+    colorTheme: 'dark',
+    symbolsGroups: [
+        {
+            name: 'Philippine Stock Exchange',
+            symbols: symbols.map((entry) => ({
+                name: `PSE:${entry.symbol}`,
+                displayName: entry.symbol,
+            })),
+        },
+    ],
+});
