@@ -189,6 +189,7 @@ export default function ChatPanel({ conversation, providerLabel }: ChatPanelProp
                         }
                     }}
                     rows={2}
+                    aria-label="Message the assistant"
                     placeholder="Ask about stocks, crypto, the screener or your holdings…"
                     className="min-h-[42px] flex-1 resize-none rounded-md border border-gray-800 bg-[#1C1C1F] px-3 py-2 text-sm text-white placeholder:text-gray-500 focus:border-teal-700 focus:outline-none"
                 />

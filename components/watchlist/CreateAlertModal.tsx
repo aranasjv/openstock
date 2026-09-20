@@ -90,8 +90,9 @@ export default function CreateAlertModal({
 
                     {/* Alert Name */}
                     <div className="grid gap-2">
-                        <Label className="text-gray-400 text-sm font-medium">Alert Name</Label>
+                        <Label htmlFor="alert-name" className="text-gray-400 text-sm font-medium">Alert Name</Label>
                         <Input
+                            id="alert-name"
                             value={alertName}
                             onChange={(e) => setAlertName(e.target.value)}
                             placeholder="e.g. Apple at Discount"
@@ -101,11 +102,12 @@ export default function CreateAlertModal({
 
                     {/* Asset Identifier */}
                     <div className="grid gap-2">
-                        <Label className="text-gray-400 text-sm font-medium">
+                        <Label htmlFor="alert-asset" className="text-gray-400 text-sm font-medium">
                             {assetType === 'crypto' ? 'Coin identifier' : 'Stock identifier'}
                         </Label>
                         <div className="relative">
                             <Input
+                                id="alert-asset"
                                 disabled
                                 value={`${companyName || symbol} (${symbol})`}
                                 className="bg-[#1C1C1F] border-none text-gray-500 shadow-inner rounded-md h-10"
@@ -115,9 +117,9 @@ export default function CreateAlertModal({
 
                     {/* Alert Type */}
                     <div className="grid gap-2">
-                        <Label className="text-gray-400 text-sm font-medium">Alert type</Label>
+                        <Label htmlFor="alert-type" className="text-gray-400 text-sm font-medium">Alert type</Label>
                         <Select disabled defaultValue="price">
-                            <SelectTrigger className="bg-[#1C1C1F] border-gray-800 text-gray-200">
+                            <SelectTrigger id="alert-type" className="bg-[#1C1C1F] border-gray-800 text-gray-200">
                                 <SelectValue placeholder="Select type" />
                             </SelectTrigger>
                             <SelectContent className="bg-[#1C1C1F] border-gray-800 text-gray-200">
@@ -128,9 +130,9 @@ export default function CreateAlertModal({
 
                     {/* Condition */}
                     <div className="grid gap-2">
-                        <Label className="text-gray-400 text-sm font-medium">Condition</Label>
+                        <Label htmlFor="alert-condition" className="text-gray-400 text-sm font-medium">Condition</Label>
                         <Select value={condition} onValueChange={(val: any) => setCondition(val)}>
-                            <SelectTrigger className="bg-[#1C1C1F] border-gray-800 text-gray-200 hover:border-gray-700 transition-colors">
+                            <SelectTrigger id="alert-condition" className="bg-[#1C1C1F] border-gray-800 text-gray-200 hover:border-gray-700 transition-colors">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent className="bg-[#1C1C1F] border-gray-800 text-gray-200">
@@ -142,10 +144,11 @@ export default function CreateAlertModal({
 
                     {/* Threshold Value */}
                     <div className="grid gap-2">
-                        <Label className="text-gray-400 text-sm font-medium">Threshold value</Label>
+                        <Label htmlFor="alert-threshold" className="text-gray-400 text-sm font-medium">Threshold value</Label>
                         <div className="relative">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-yellow-500 font-semibold">$</span>
                             <Input
+                                id="alert-threshold"
                                 type="number"
                                 step="0.01"
                                 value={targetPrice}

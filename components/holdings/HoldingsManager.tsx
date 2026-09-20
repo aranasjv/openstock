@@ -115,6 +115,7 @@ export default function HoldingsManager({ holdings }: HoldingsManagerProps) {
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
                     <select
                         value={assetType}
+                        aria-label="Asset type"
                         onChange={(e) => {
                             setAssetType(e.target.value as 'stock' | 'crypto');
                             setSymbol('');
@@ -128,6 +129,7 @@ export default function HoldingsManager({ holdings }: HoldingsManagerProps) {
                     <input
                         list="holding-symbols"
                         value={symbol}
+                        aria-label={assetType === 'crypto' ? 'Coin id' : 'Ticker symbol'}
                         onChange={(e) => setSymbol(e.target.value)}
                         placeholder={assetType === 'crypto' ? 'bitcoin' : 'AAPL'}
                         className="h-9 rounded-md border border-gray-800 bg-[#1C1C1F] px-3 font-mono text-sm text-white placeholder:text-gray-500"
@@ -145,6 +147,7 @@ export default function HoldingsManager({ holdings }: HoldingsManagerProps) {
                         step="any"
                         min="0"
                         value={quantity}
+                        aria-label="Quantity"
                         onChange={(e) => setQuantity(e.target.value)}
                         placeholder="Quantity"
                         className="h-9 rounded-md border border-gray-800 bg-[#1C1C1F] px-3 text-sm text-white placeholder:text-gray-500"
@@ -156,6 +159,7 @@ export default function HoldingsManager({ holdings }: HoldingsManagerProps) {
                             step="any"
                             min="0"
                             value={averageCost}
+                            aria-label="Average cost"
                             onChange={(e) => setAverageCost(e.target.value)}
                             placeholder="Avg cost"
                             className="h-9 w-full rounded-md border border-gray-800 bg-[#1C1C1F] px-3 text-sm text-white placeholder:text-gray-500"
