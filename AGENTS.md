@@ -32,6 +32,14 @@ Provenance, licences, the exact upstream commits, and the list of what was delib
 vendored are in [`.agents/UPSTREAM.md`](.agents/UPSTREAM.md). Read it before editing anything
 under `.agents/`. Refresh with `git clone --depth 1` + `cp -r`.
 
+**The playbooks are CLI-shaped; the app is not.** 17 of the 23 `SKILL.md` files instruct the
+agent to run `python3 scripts/*.py` and to read/write `state/` and `reports/`. The runtime image
+is `node:20-alpine` — there is **no Python and no writable state directory**. Those scripts are
+*reference implementations* and are never executed; when the assistant applies a playbook it has
+to map the steps onto `lib/ai-tools.ts` tools (or a `lib/` port). That bridge does not exist yet,
+which is why a naive `get_analysis_playbook` call can leave the model describing a script it
+cannot run. See §2.1 of [`PROJECT_REVIEW.md`](PROJECT_REVIEW.md).
+
 ### Analysis playbooks (tradermonty/claude-trading-skills, MIT)
 
 | Skill | Use it for |

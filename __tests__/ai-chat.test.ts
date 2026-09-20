@@ -30,6 +30,9 @@ const listAnalysisSkills = vi.fn();
 
 vi.mock('@/lib/analysis-skills', () => ({
     listAnalysisSkills: () => listAnalysisSkills(),
+    // Mirrors lib/analysis-skills.ts; that value is asserted against every vendored playbook
+    // by analysis-skills.test.ts.
+    MAX_PLAYBOOK_CHARS: 32_000,
 }));
 
 let configValues: Record<string, string> = {};

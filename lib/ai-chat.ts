@@ -7,7 +7,7 @@ import {
     type AIToolCall,
 } from '@/lib/ai-provider';
 import { getTool, getToolSpecs, type AIToolContext } from '@/lib/ai-tools';
-import { listAnalysisSkills } from '@/lib/analysis-skills';
+import { listAnalysisSkills, MAX_PLAYBOOK_CHARS } from '@/lib/analysis-skills';
 import { loadConfig } from '@/lib/config';
 
 /**
@@ -38,10 +38,10 @@ const MAX_TOOL_RESULT_CHARS = 6_000;
 
 /**
  * Analysis playbooks are read whole — a methodology cut off mid-way is worse than useless —
- * so the vendored skills get a larger budget than ordinary data results. Still bounded: the
- * largest vendored playbook is ~18KB, and the model only pulls one when it needs it.
+ * so the vendored skills get a larger budget than ordinary data results. The size lives with
+ * the loader (`MAX_PLAYBOOK_CHARS`) and is asserted against every vendored playbook by the
+ * test suite, so this cannot silently start clipping one.
  */
-const MAX_PLAYBOOK_RESULT_CHARS = 24_000;
 const PLAYBOOK_TOOL = 'get_analysis_playbook';
 
 /** How much of each playbook description goes into the system prompt. */
@@ -292,7 +292,7 @@ export async function runChatTurn({
                 const serialised = JSON.stringify(result);
                 // A playbook is read whole; everything else keeps the tighter data budget.
                 const budget =
-                    call.name === PLAYBOOK_TOOL ? MAX_PLAYBOOK_RESULT_CHARS : MAX_TOOL_RESULT_CHARS;
+                    call.name === PLAYBOOK_TOOL ? MAX_PLAYBOOK_CHARS : MAX_TOOL_RESULT_CHARS;
                 const truncated =
                     serialised.length > budget
                         ? `${serialised.slice(0, budget)}… (truncated)`

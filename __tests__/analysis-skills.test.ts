@@ -18,6 +18,7 @@ import {
     getAnalysisSkillSummary,
     loadAnalysisSkill,
     resetAnalysisSkillCache,
+    MAX_PLAYBOOK_CHARS,
 } from '@/lib/analysis-skills';
 
 const REAL_SKILLS_DIR = path.join(process.cwd(), '.agents', 'skills');
@@ -188,6 +189,23 @@ describe('the vendored playbooks', () => {
         expect(ids).toContain('vercel-react-best-practices');
 
         delete process.env.ANALYSIS_SKILLS_DIR;
+    });
+
+    it('fits every vendored playbook inside the chat budget', async () => {
+        process.env.ANALYSIS_SKILLS_DIR = REAL_SKILLS_DIR;
+        resetAnalysisSkillCache();
+
+        const oversized: string[] = [];
+        for (const skill of await listAnalysisSkills()) {
+            const document = await loadAnalysisSkill(skill.id);
+            // The chat sends the body inside a JSON envelope, so leave headroom for it.
+            if ((document?.body.length ?? 0) + 500 > MAX_PLAYBOOK_CHARS) oversized.push(skill.id);
+        }
+
+        delete process.env.ANALYSIS_SKILLS_DIR;
+        // Guards the bug this caught: two playbooks were larger than the old 24k budget and
+        // were being silently truncated mid-procedure.
+        expect(oversized).toEqual([]);
     });
 
     it('reads a real playbook body end to end', async () => {

@@ -55,6 +55,17 @@ const SAFE_ID = /^[a-z0-9][a-z0-9-]*$/;
 /** Documents a skill may expose besides SKILL.md. */
 const REFERENCE_DIRS = ['references', 'assets'];
 
+/**
+ * How much of a playbook may be handed to the model in one go.
+ *
+ * A truncated methodology is worse than none — the model follows half a procedure and reports
+ * it as done — so this must exceed the largest vendored SKILL.md. It currently does so
+ * comfortably (the largest is `market-news-analyst` at ~27.8KB); the test suite asserts that
+ * every vendored playbook fits, so vendoring a bigger skill fails loudly rather than silently
+ * clipping it.
+ */
+export const MAX_PLAYBOOK_CHARS = 32_000;
+
 interface Frontmatter {
     name: string;
     description: string;

@@ -1,21 +1,22 @@
-# Project review — 2026-09-20 (revision 2)
+# Project review — 2026-09-20 (revision 3)
 
 A one-off, thorough review of OpenStock through three lenses. Every finding is grounded in a
 `file:line` that was read, not inferred. Severity: **blocker** · **major** · **minor**.
 
-**Revision 2** re-runs the review against the 23 upstream playbooks now vendored in
-[`.agents/skills/`](.agents/skills/) (provenance in [`.agents/UPSTREAM.md`](.agents/UPSTREAM.md)).
-Revision 1 was written against paraphrases; this one is grounded in the **actual** weights,
-thresholds and formulas those playbooks ship, so the feature proposals below specify a method
-instead of describing one. Sections [§0](#0-stop-ship-broken-access-control) and the UI
-evidence are unchanged — the skills do not affect them.
+**Revision 3** restructures [§2](#2-ai-features--can-the-web-app-run-all-twenty-playbooks) to
+answer one question directly: *can all twenty trading playbooks run as AI features on the web
+app?* Short answer — **yes, and none of them needs a Python runtime.** §2 sets out the four
+layers of work, the bridge that is missing today, and a per-skill verdict.
+
+**Revision 2** re-ran the review against the 23 playbooks vendored in
+[`.agents/skills/`](.agents/skills/) (provenance in [`.agents/UPSTREAM.md`](.agents/UPSTREAM.md)),
+so the proposals below specify the **actual** weights, thresholds and formulas those playbooks
+ship. [§0](#0-stop-ship-broken-access-control) and the UI evidence are unchanged — the skills do
+not affect them.
 
 Reviewed with:
 
-- `market-breadth-analyzer`, `uptrend-analyzer`, `exposure-coach`, `crypto-regime-analyzer`,
-  `position-sizer`, `pre-trade-discipline-gate`, `drawdown-circuit-breaker`,
-  `vcp-screener`, `canslim-screener`, `breakout-trade-planner`, `trader-memory-core`,
-  `backtest-expert` → **new features** ([§2](#2-new-features--grounded-in-the-vendored-playbooks))
+- the 20 trading playbooks below → **AI features** ([§2](#2-ai-features--can-the-web-app-run-all-twenty-playbooks))
 - `vercel-react-best-practices` → **architecture** ([§1](#1-architecture--development-lens))
 - `web-design-guidelines` → **UI/UX** ([§3](#3-uiux))
 
@@ -68,7 +69,7 @@ The rule ids below are the ones that actually bite here.
 | A2 | **A DB outage renders as "no data"** — an error looks like an empty list. | `watchlist.actions.ts:66`; `holdings.actions.ts:195`; `alert.actions.ts:39` | — | Distinguish empty from failed; surface degraded state. |
 | A3 | **Unbounded outbound fan-out** — one request per symbol, no cap. | `finnhub.actions.ts:103,130` | — | Cap the list length. |
 | A4 | **Unbounded DB reads** — no `.limit()` on list queries. | `alert.actions.ts:38`; `watchlist.actions.ts:64,108`; `holdings.actions.ts:37,151` | — | `.limit()` + pagination. |
-| A5 | **Per-process state undocumented for the CoinGecko gate and the scheduler.** | `crypto.actions.ts:55-56`; `scheduler.ts:214` | `server-no-shared-module-state` | Document and enforce single-replica, or move to a shared store. The rule is technically violated on purpose; say so. |
+| A5 | **Per-process state undocumented for the CoinGecko gate and the scheduler.** | `crypto.actions.ts:55-56`; `scheduler.ts:214` | `server-no-shared-module-state` | Document and enforce single-replica, or move to a shared store. The rule is violated on purpose; say so. |
 
 ### Correctness
 
@@ -94,7 +95,7 @@ The rule ids below are the ones that actually bite here.
 
 | # | Finding |
 |---|---|
-| A11 | `lib/actions/*` is almost entirely untested — exactly where S1–S3 live. Only `screener.actions.ts` (`explainCandidate`) has coverage. The vendored `dual-axis-skill-reviewer` scores skills on test health for the same reason. |
+| A11 | `lib/actions/*` is almost entirely untested — exactly where S1–S3 live. Only `screener.actions.ts` (`explainCandidate`) has coverage. |
 | A12 | No coverage for `lib/config.ts`, `lib/jobs/*`, `lib/inngest/*`. |
 
 **Recommendation:** one authorization test per personal action — "a spoofed `userId` cannot
@@ -102,62 +103,98 @@ touch another user's document". That single pattern would have caught S1–S3.
 
 ---
 
-## 2. New features — grounded in the vendored playbooks
+## 2. AI features — can the web app run all twenty playbooks?
 
-### 2.0 What the playbooks change
+**Yes.** All nineteen you listed, plus `exposure-coach` (which completes the regime set), can run
+as AI features on the web app — and **not one of them needs a Python runtime**.
 
-The playbooks are complete implementations, so each proposed feature now has a specified
-method, weights and thresholds rather than a description. They also make the **data gaps**
-explicit — which is the most useful thing about them.
+The interpretation layer is already built: the assistant reads any playbook verbatim through
+`get_analysis_playbook` and applies it to data its own tools fetch. What is missing is everything
+*around* the prose, and it sorts into four layers. There is no point at which "the LLM cannot do
+this" is the blocker.
 
-| Playbook | Ships | OpenStock already has | Missing |
-|---|---|---|---|
-| `crypto-regime-analyzer` | 6 weighted components (25/20/15/15/15/10), 0–100, zones 80/40 | CoinGecko `/coins/markets` + `market_chart` + 200d history | BTC dominance (`/global`), Binance funding, and 31 days of stored dominance history |
-| `market-breadth-analyzer` | 6 components (25/20/20/15/10/10), zones 80/60/40/20 | nothing breadth-specific | TraderMonty public CSVs (keyless HTTP) |
-| `uptrend-analyzer` | 5 components (30/25/15/20/10) + warning penalties | nothing | Monty uptrend-ratio CSVs (keyless) |
-| `exposure-coach` | Posture: exposure ceiling %, `NEW_ENTRY_ALLOWED`/`REDUCE_ONLY`/`CASH_PRIORITY`, confidence | nothing | input JSONs from the two above |
-| `position-sizer` | Fixed-fractional / ATR / half-Kelly; `max-position-pct`, `max-sector-pct`; floors, never rounds up | `get_indicators` gives `price`, `low20`, `volatility` | account equity + risk % (user input) |
-| `pre-trade-discipline-gate` | `GO`/`REVIEW_REQUIRED`/`NO_GO` + exact blocking rules | nothing | written plan, planned vs actual risk $ |
-| `drawdown-circuit-breaker` | daily 2% / weekly 5% / monthly 8% / 2-loss → 24h cooldown | nothing | realized P&L ledger — **blocked on F4** |
-| `vcp-screener` | Stage-2 trend template + contraction detection, `trend-min-score` 85, contraction ratio 0.70, volume 1.5× | SMA/RSI/MACD/high-low/volume — enough for the technical half | relative strength vs a benchmark |
-| `canslim-screener` | 7 weighted components (C15 A20 N15 S15 L20 I10 M5) | price/volume (N, S, M partially) | EPS/revenue growth (C, A), institutional ownership (I) |
-| `breakout-trade-planner` | entry/stop/target, worst-case risk ≤ 8%, heat ≤ 6%, default 2R target | screener candidates | nothing structural |
-| `trader-memory-core` | thesis lifecycle + P&L ledger + MAE/MFE | nothing | a model and UI |
-| `backtest-expert` | 6-step validation, 5-dimension scoring, Deploy/Refine/Abandon | 1y Yahoo / 200d CoinGecko history | nothing structural |
+### 2.1 The bridge problem — read this first
 
-### F1 — Crypto regime panel · *high value, medium effort, mostly existing data*
-`crypto-regime-analyzer` is the most directly implementable playbook, because it uses
-**CoinGecko — the source OpenStock already integrates** — plus Binance's keyless funding
-endpoint. Port the six weighted components and the 0–100 composite with the 80/40 zones:
+**17 of the 23 vendored `SKILL.md` files instruct the model to run `python3 scripts/*.py`**, to
+write `state/*.yaml`, and to emit `reports/*.md`. The container is `node:20-alpine`: no Python,
+no `state/` directory, no filesystem to write to.
 
-1. **BTC trend structure (25%)** — price vs 50/200 DMA stack, 200 DMA slope. Fully available.
-2. **Alt breadth (20%)** — % of the top-N above their 200 DMA. Available via the existing
-   serialised `getCryptoPriceHistory` (the 6h cache makes it cheap after the first run).
-3. **BTC dominance regime (15%)** — needs CoinGecko `/global` (one new call) and a stored
-   daily observation history; the playbook's own note is that the component reports
-   `data_available: false` until 31 days accumulate, with its weight redistributed.
-4. **Perpetual funding (15%)** — Binance `fapi` (keyless); skip gracefully when unreachable.
-5. **Drawdown & volatility position (15%)** — `maxDrawdown` + `volatility` already computed.
-6. **Momentum thrust (10%)** — % of the universe positive over 30d; `change30d` exists.
+Handed a playbook unmodified, the model will either claim to have run a script it cannot run, or
+stall asking for a file that will never exist. This is the single biggest gap between "the
+playbooks are in the repo" and "the playbooks work" — and it is a *prompt-bridging* problem, not
+an engineering one.
 
-The playbook's proportional-weight-redistribution convention and fail-closed behaviour on
-sparse data are the two details worth copying exactly.
-**Files:** new `lib/regime.ts` + a `/api/crypto-regime` or server action; a panel on the crypto
-dashboard; a `get_crypto_regime` assistant tool.
+The fix is a **bridge**: a short note served alongside each playbook saying how to do it *here* —
+*"you do not have `scripts/analyze_breadth.py`; compute the components from `get_indicators` over
+the screener universe instead."* `lib/analysis-skills.ts` already resolves the id and the file
+(and `get_analysis_playbook` already accepts a `section` argument), so the bridge hangs off the
+registry and is appended at serve time. It is the highest value-per-line change in the whole
+plan: it turns 20 documents into 20 working functions.
 
-### F2 — Equity breadth via `market-breadth-analyzer` / `uptrend-analyzer` · *high value, low effort*
-Both consume **public, keyless CSVs** (TraderMonty GitHub Pages; Monty's uptrend ratios). That
-is a new outbound source, but the cheapest kind: no key, no rate limit, and the scoring is
-already written. Either port the 6-component / 5-component scorers, or — cheaper — display the
-published series and let the assistant fetch and interpret them.
+### 2.2 The two ways a playbook becomes a feature
 
-**Caution:** do not conflate this with F1. The crypto regime and equity breadth are different
-universes with different inputs; reporting one as "the market" is the failure mode both
-playbooks warn about.
+| | **Path A — assistant-read** | **Path B — deterministic engine** |
+|---|---|---|
+| What it is | The model loads the playbook and applies it to tool output | A TypeScript port in `lib/` computes the artifact |
+| Use when | The output is judgement, prose, or a plan | The output is a **number that must be reproducible** |
+| Cost | ~zero — already built | Real work, per skill |
 
-### F3 — Position sizing · *high value, low effort, no new data*
-`position-sizer` specifies the maths precisely, so this is transcription rather than design.
-Default **fixed-fractional**:
+This repo already made that choice once and got it right: `lib/strategies.ts` scores candidates
+deterministically and the model only writes the prose (`explainCandidate`). **Every scorer below
+must follow that pattern — compute in code, explain in the model.** Asking an LLM to produce a
+0–100 breadth composite by reading ten JSON blobs yields a confident number that is *not* the one
+the methodology specifies, which is worse than no number at all.
+
+### 2.3 Feasibility — every skill
+
+Legend: **✅** works via assistant + existing tools once the bridge exists · **🟡** needs a new
+data source · **🟠** needs a TypeScript engine · **🔴** needs persistence first.
+
+| # | Skill | Produces | Path | Needs | Today |
+|---|---|---|---|---|---|
+| 1 | `technical-analyst` | Support/resistance, trend, momentum read | A | Daily OHLCV → weekly resample | ✅ |
+| 2 | `pre-trade-discipline-gate` | `GO` / `REVIEW_REQUIRED` / `NO_GO` | A + B | Plan inputs; better once history exists | ✅ |
+| 3 | `position-sizer` | Shares, risk $, binding constraint | **B** | Equity, entry, stop — pure arithmetic | ✅ concept, 🟠 to trust the number |
+| 4 | `breakout-trade-planner` | Levels, stop, 2R targets, portfolio heat | A + **B** | `get_indicators` + the sizer | ✅ narrative, 🟠 levels |
+| 5 | `us-stock-analysis` | Full single-name brief | A | **Fundamentals** — A10 currently fakes P/E as `0` | 🟡 |
+| 6 | `market-news-analyst` | 10-day ranked, deduped sentiment | A + B | Multi-day news corpus + scoring | 🟡 |
+| 7 | `earnings-calendar` | Event-risk dates per position | **B** | Finnhub `/calendar/earnings` — provider already integrated | 🟡 one endpoint |
+| 8 | `crypto-regime-analyzer` | 0–100 regime + zone (80/40) | **B** | CoinGecko (have) + `/global` dominance + Binance funding — all keyless | 🟠 closest to done |
+| 9 | `market-breadth-analyzer` | 0–100 breadth composite | **B** | TraderMonty public CSVs (keyless, new) | 🟠 |
+| 10 | `uptrend-analyzer` | 0–100 uptrend ratio | **B** | Same CSVs | 🟠 |
+| 11 | `exposure-coach` | Exposure ceiling + recommendation | **B** | Synthesises #9 + #10 | 🟠 blocked on 9/10 |
+| 12 | `vcp-screener` | VCP pattern matches | **B** | OHLCV (have) + benchmark; trend template, contraction detection | 🟠 |
+| 13 | `canslim-screener` | 0–100 C-A-N-S-L-I-M | **B** | OHLCV (have) + **fundamentals for C/A/I** | 🟠 engine + data |
+| 14 | `backtest-expert` | Validated strategy + metrics | **B** | History engine; expectancy, profit factor, drawdown | 🟠 |
+| 15 | `trader-memory-core` | Thesis lifecycle store | **B + state** | Mongo model replacing `state/theses/*.yaml` | 🔴 |
+| 16 | `signal-postmortem` | Per-trade review, MAE/MFE | A + **B** | Closed trades | 🔴 blocked on 15 |
+| 17 | `trade-performance-coach` | Cohort / edge analysis | **B** | Closed trades | 🔴 blocked on 15 |
+| 18 | `weekly-performance-digest` | Weekly **trade** stats + narrative | **B** | Closed trades | 🔴 blocked on 15 |
+| 19 | `drawdown-circuit-breaker` | `TRADING_ALLOWED` / `COOLDOWN` / `HALTED` | **B** | Realised P&L ledger | 🔴 blocked on 15 |
+| 20 | `market-environment-analysis` | Macro / rates / commodities posture | A | Macro data — **no source integrated** | 🔴 no data |
+
+Two honest notes. **#20 will stay partial**: it needs rates, commodities and FX, and there is no
+provider for them (no good keyless source exists). **#13 is the weakest data link**: C, A and I
+need fundamentals; Finnhub's free tier covers the first two via `/stock/metric`, but
+institutional ownership is the piece that is not reliably free.
+
+One clarification: the market-data digest that already ships is *not* #18. #18 is a digest of
+**your trades**, so it is downstream of #15 like the other three.
+
+### 2.4 Layer 1 — the bridge, plus two read tools
+
+Cheapest layer, unlocks the most. Work: the per-playbook bridge note, plus two read-only tools so
+the model has somewhere to go — `get_earnings_calendar` (#7) and a benchmark-relative
+`get_benchmark_history` (SPY for stocks, BTC for coins, which is also the input for the relative
+strength factor below). Together those close #6, #7 and half of #12, and both are small additions
+to an existing pattern in `lib/ai-tools.ts`.
+
+### 2.5 Layer 2 — the deterministic engines
+
+Port in this order, because each reuses the last.
+
+**F3 — `position-sizer` (#3).** Pure arithmetic, no data, no network, fully unit-testable, and it
+is also the missing half of `breakout-trade-planner`. Default **fixed-fractional**:
 
 ```
 riskPerShare = entry − stop
@@ -165,94 +202,112 @@ riskDollars  = accountEquity × riskPct          # default 1%, never above 2%
 shares       = riskDollars / riskPerShare        # FLOOR, never round up
 ```
 
-with ATR mode (`stop = entry − ATR × multiplier`, default 2.0×) and **half-Kelly** from
-win/loss stats. Then apply constraints and take the **strictest**:
-`max-position-pct` (10%), `max-sector-pct` (30%), and portfolio heat **≤ 6%** (the playbook
-allows 6–8%; take 6, matching `breakout-trade-planner`'s default). Report the binding
-constraint — `binding_constraint` is a field in the playbook's own output schema.
+with an ATR mode (`stop = entry − ATR × multiplier`, default 2.0×) and **half-Kelly** from
+win/loss stats. Then apply the constraints and take the **strictest**: `max-position-pct` (10%),
+`max-sector-pct` (30%), and portfolio heat **≤ 6%** (the playbook allows 6–8%; take 6, matching
+`breakout-trade-planner`'s default). Report the binding constraint — `binding_constraint` is a
+field in the playbook's own output schema. Entry/stop come from `get_indicators` (`price`,
+`low20`); equity and risk % are user inputs.
+*Files:* new pure `lib/position-sizing.ts` (the playbook's `scripts/position_sizer.py` is the
+reference implementation, with a 24KB test suite worth mirroring); a panel/drawer; feed the levels
+into the existing alert creation.
 
-Entry/stop come from `get_indicators` (`price`, `low20`); equity and risk % are user inputs.
-**Files:** new pure `lib/position-sizing.ts` (the playbook's `scripts/position_sizer.py` is the
-reference implementation and has a 24KB test suite worth mirroring); a panel/drawer; feed the
-levels into the existing alert creation.
+**F1 — `crypto-regime-analyzer` (#8).** The best value-for-effort feature in the review, because
+it uses **CoinGecko — the source already integrated** — plus Binance's keyless funding endpoint.
+Six weighted components, 0–100 composite, 80/40 zones:
 
-### F4 — Trade journal / thesis lifecycle · *high value, medium effort*
-`trader-memory-core` is the biggest structural gap. It defines a **forward-only** lifecycle
-`IDEA → ENTRY_READY → ACTIVE → CLOSED | INVALIDATED`, partial trims with `shares_remaining`,
-a cumulative realized-P&L ledger, MAE/MFE in the postmortem, and a JSON Schema
-(`schemas/thesis.schema.json`) that maps cleanly onto a Mongoose model.
-`drawdown-circuit-breaker` (F11) and `pre-trade-discipline-gate` both read this state, so it is
-the prerequisite for the whole risk half of the playbook set — hence P2 rather than P3.
+1. **BTC trend structure (25%)** — price vs 50/200 DMA stack, 200 DMA slope. Fully available.
+2. **Alt breadth (20%)** — % of top-N above their 200 DMA, via the existing serialised
+   `getCryptoPriceHistory` (the 6h cache makes it cheap after the first run).
+3. **BTC dominance regime (15%)** — needs `/global` (one new call) plus a stored daily history;
+   the playbook's own note is that this component reports `data_available: false` until 31 days
+   accumulate, with its weight redistributed.
+4. **Perpetual funding (15%)** — Binance `fapi` (keyless); skip gracefully when unreachable.
+5. **Drawdown & volatility position (15%)** — `maxDrawdown` + `volatility` already computed.
+6. **Momentum thrust (10%)** — `change30d` over the universe.
 
-**Files:** `database/models/thesis.model.ts` mirroring the schema; `lib/actions/journal.actions.ts`;
-a `/journal` page; a `get_my_theses` assistant tool.
+Copy its proportional-weight-redistribution convention and its fail-closed behaviour on sparse
+data exactly.
+*Files:* new `lib/regime.ts` + a server action; a panel on the crypto dashboard; a
+`get_crypto_regime` assistant tool.
 
-### F5 — Strategy validation with `backtest-expert` · *high value, medium effort, no new data*
-`lib/strategies.ts` says "nothing here is backtested". The playbook turns that into a process:
-state the hypothesis, codify with zero discretion, test **≥ 5 years across regimes**, then
-spend 80% of the effort trying to break it — parameter sensitivity at 50/75/100/125/150% of
-baseline, slippage at 1.5–2×, walk-forward in/out-of-sample, and sample sizes of 30
-(minimum) / 100 (preferred) / 200 (high confidence). Verdict is **Deploy / Refine / Abandon**
-from a 5-dimension score.
+**F6 — relative strength (#12, #13).** Not a playbook of its own, but `canslim-screener` weights
+leadership (L) at **20%** with `RS = 0.40×3m + 0.30×6m + 0.30×12m` versus a benchmark, and
+`vcp-screener` requires a 7-point Stage-2 trend template — while `lib/strategies.ts` has **no
+benchmark-relative criterion at all**. One RS criterion (vs SPY for stocks, vs BTC for coins) on
+the existing history functions is the highest-value single addition to the screener, and it is the
+piece both playbooks agree on.
+*Files:* `lib/indicators.ts` (relative-return helper) + `lib/strategies.ts` (criterion).
 
-Two of its warnings apply directly to this codebase: OpenStock's universe is a **curated
-50-symbol list** (`POPULAR_STOCK_SYMBOLS`), which is survivorship-flavoured if reused as a
-backtest universe; and `computeIndicators` needs 200 bars, so a 1-year Yahoo window gives very
-few evaluable signals — the history range must be extended first.
+**F9 — `drawdown-circuit-breaker` (#19).** Trivial arithmetic once the ledger exists: **daily
+−2%**, **weekly −5%**, **monthly −8%**, and **2 consecutive losses → 24h cooldown**, all on
+*realised* P&L only (not unrealised), fail-closed on incomplete state, with an *empty* state
+permitting a new user to begin.
 
-**Files:** new `lib/backtest.ts` over `indicators.ts` + `strategies.ts`; a results panel;
-`--as-of`-style determinism so results are reproducible.
+### 2.6 Layer 3 — persistence (unlocks four skills at once)
 
-### F6 — Relative strength as a screener criterion · *medium value, low effort*
-`canslim-screener` weights leadership (L) at **20%** with
-`RS = 0.40×3m + 0.30×6m + 0.30×12m` versus a benchmark, and `vcp-screener` requires a 7-point
-Stage-2 trend template. OpenStock's `lib/strategies.ts` has no benchmark-relative criterion at
-all — every strategy is absolute. Adding one RS criterion (vs SPY for stocks, vs BTC for coins)
-using the existing history functions is the highest-value single addition to the screener, and
-it is the piece both playbooks agree on.
-**Files:** `lib/indicators.ts` (relative return helper) + `lib/strategies.ts` (criterion).
+**F4 — `trader-memory-core` (#15)** is the keystone and the biggest structural gap. It defines a
+**forward-only** lifecycle `IDEA → ENTRY_READY → ACTIVE → CLOSED | INVALIDATED`, partial trims
+with `shares_remaining`, a cumulative realised-P&L ledger, MAE/MFE, and a JSON Schema
+(`schemas/thesis.schema.json`) that maps cleanly onto Mongoose.
 
-### F7 — Trailing stops and R-multiple alerts · *medium value, low effort*
-`breakout-trade-planner` supplies the defaults: target **2R**, stop buffer 1% below the
-contraction low, max chase 2% above the pivot. Alerts currently store only an absolute
-`targetPrice`. Storing an anchor price lets a target be expressed as `−8%` or `2R from entry`.
-**Files:** `database/models/alert.model.ts`; `lib/actions/alert.actions.ts`;
-`lib/jobs/alert-check.ts`; `components/watchlist/CreateAlertModal.tsx`.
+Build it and **#16, #17, #18 and #19 all become computable** — they are three views over one
+dataset plus one gate. That is the largest single unlock in the plan, and it is also what
+`pre-trade-discipline-gate` needs to stop being a one-shot checklist.
+*Files:* `database/models/thesis.model.ts` mirroring the schema;
+`lib/actions/journal.actions.ts`; a `/journal` page; a `get_my_theses` assistant tool.
 
-### F8 — Earnings dates as an event-risk gate · *medium value, low effort*
-`earnings-calendar` and `pre-trade-discipline-gate` both treat an imminent binary event as a
-gate item; today it is permanently "unknown" here. Finnhub (already integrated, free tier)
-exposes an earnings calendar, so this is one action + a surface, not a new vendor.
-**Files:** `lib/actions/finnhub.actions.ts` + a calendar surface.
+### 2.7 Layer 4 — data sources
 
-### F9 — Account-level circuit breaker · *medium value, medium effort, blocked on F4*
-`drawdown-circuit-breaker` ships exact defaults: **daily −2%**, **weekly −5%**, **monthly −8%**,
-and a **2-consecutive-loss 24h cooldown**, all on realized P&L only (not unrealized), with
-fail-closed behaviour on incomplete state and the rule that an *empty* state allows a new user
-to begin. It cannot be built before F4 provides the realized-P&L ledger.
+**F2 — equity breadth (#9, #10, #11).** `market-breadth-analyzer` (6 components,
+25/20/20/15/10/10) and `uptrend-analyzer` (5 components, 30/25/15/20/10, plus warning penalties)
+both consume **public, keyless CSVs** (TraderMonty GitHub Pages). That is a new outbound source,
+but the cheapest kind: no key, no rate limit, and the scoring is already written. Port the
+scorers, or — cheaper — display the published series and let the assistant fetch and interpret
+them. `exposure-coach` (#11) then synthesises both into an exposure ceiling and a
+`NEW_ENTRY_ALLOWED` / `REDUCE_ONLY` / `CASH_PRIORITY` call.
 
-### F10 — Portfolio risk (beta / correlation / concentration) · *medium value, medium effort*
-`getPortfolioSummary` computes only value/cost/PnL. Per-asset `volatility` and `maxDrawdown`
-exist, and a benchmark series is one call away for both markets, so weighted volatility, max
-drawdown, beta and correlation are all derivable. Note: **no vendored playbook covers
-cross-asset statistics** — the closest, `portfolio-manager`, is built around Alpaca and
-holdings-level allocation rather than risk factors. This one is original work.
+**Caution:** do not conflate this with F1. Crypto regime and equity breadth are different
+universes with different inputs; reporting one as "the market" is the failure mode both playbooks
+warn about.
 
-### Lower priority
-`us-stock-analysis` (a full single-name report format worth copying for the stock page),
-`market-environment-analysis` / `market-news-analyst` (macro and impact-ranked news), and
-`trade-performance-coach` + `weekly-performance-digest` (expectancy, profit factor, MAE/MFE
-cohort stats — all downstream of F4).
+**F8 — earnings (#7).** `earnings-calendar` and `pre-trade-discipline-gate` both treat an imminent
+binary event as a gate item; today it is permanently "unknown" here. Finnhub (already integrated,
+free tier) exposes an earnings calendar, so this is one action + a surface, not a new vendor.
 
-### Explicitly not recommended
-- **Full CANSLIM.** C, A and I need EPS/revenue growth and institutional ownership. Finnhub can
-  supply some of this on the free tier, but a partial implementation would produce a
-  confident-looking 0–100 score with three components stubbed — worse than the honest
-  technical-only screen that exists now. Take the L component (F6) and leave the rest.
-- **Porting the Python scripts.** They are the reference implementation and the tests are
-  valuable, but there is no Python runtime in the image and the app's own data layer is the
-  right input. Port the *method*, not the code.
-- **Real-time streaming, automated execution, options/futures/pair-trading.** Out of scope.
+### 2.8 What will not work
+
+- **Python is never executed.** `scripts/` is reference implementation, not runtime. Anything
+  needed from it must be rewritten in TypeScript — port the *method*, not the code.
+- **`--as-of` determinism and the `state/`/`reports/` filesystems** must become Mongo writes and
+  server actions; the playbooks assume a filesystem the container does not have.
+- **LLM arithmetic is not acceptable** for any scorer. Path B, or nothing.
+- **Full CANSLIM.** C, A and I need EPS/revenue growth and institutional ownership; a partial
+  implementation would produce a confident-looking 0–100 with three components stubbed — worse
+  than the honest technical-only screen that exists now. Take the L component (F6) and leave the
+  rest.
+- **Futures, options, MT5, pair trading, dividend tax, DeFi, real-time streaming, automated
+  execution.** Out of scope, and not vendored.
+
+Two warnings from `backtest-expert` (#14) apply directly here: OpenStock's universe is a
+**curated 50-symbol list** (`POPULAR_STOCK_SYMBOLS`) — survivorship-flavoured if reused as a
+backtest universe — and `computeIndicators` needs 200 bars, so a 1-year Yahoo window yields very
+few evaluable signals. The history range must be extended before #14 is meaningful.
+
+Also worth knowing: **no vendored playbook covers cross-asset statistics** (beta, correlation,
+concentration). The closest, `portfolio-manager`, is built around Alpaca and allocations rather
+than risk factors, so that remains original work.
+
+### 2.9 Build order
+
+| Phase | Work | Unlocks |
+|---|---|---|
+| **A** | Bridge notes + `get_earnings_calendar` + benchmark history | #1, #2, #4, #6, #7 usable; #5 partial |
+| **B** | `position-sizer` → `crypto-regime-analyzer` → relative-strength criterion | #3, #8, #4 complete, #12/#13 partial |
+| **C** | Thesis / journal model (Mongo) | #15 |
+| **D** | Postmortem, coach, digest, circuit breaker over the journal | #16, #17, #18, #19 |
+| **E** | TraderMonty CSVs → breadth + uptrend → exposure-coach | #9, #10, #11 |
+| **F** | VCP + CANSLIM engines (fundamentals permitting), `backtest-expert` engine | #12, #13, #14 |
 
 ---
 
@@ -316,11 +371,13 @@ generated-page tell, and at `gray-700` currently invisible anyway.
 
 | Priority | Items |
 |---|---|
-| **P0 — now** | S1–S4 (access control). Add the authorization tests (A11) in the same change. |
-| **P1 — next** | U1, U2, U3, U12, U13 (cheap and app-wide), A1 (fetch timeouts), A2 (degrade honestly), A7/A9 (validate + guard). |
-| **P2 — then** | F3 (position sizing) + F1 (crypto regime) — highest value per unit of effort, and F1 can reuse the existing CoinGecko layer; F6 (relative strength); F4 (journal) to unblock F9; U4–U9, U14, U15, A6, A10. |
-| **P3 — later** | F2, F5, F7, F8, F10, remaining minors. |
+| **P0 — now** | S1–S4 (access control) + the authorization tests (A11) in the same change. |
+| **P1 — next** | UI blockers U1, U2, U3, U12, U13 (cheap, app-wide); A1 (fetch timeouts); A2 (degrade honestly); A7/A9 (validate + guard). |
+| **P2 — the AI layer** | §2.9 phase A (bridge + two tools) → phase B (`position-sizer`, `crypto-regime-analyzer`, relative strength); U4–U9, U14, U15, A6, A10. |
+| **P3 — persistence** | §2.6 thesis/journal model, then the four skills it unlocks. |
+| **P4 — depth** | Phases E–F: equity breadth, uptrend, exposure-coach; VCP/CANSLIM engines; backtest engine. |
+| **P5 — polish** | Remaining U/A minors; portfolio risk (beta, correlation, concentration). |
 
-Every P2+ item has a specified method in `.agents/skills/` and is readable by the running app
-through `lib/analysis-skills.ts` — so the same playbook can drive the implementation, the
-assistant's answers, and the review of the result.
+Everything in P2+ has its method already specified in `.agents/skills/` and is readable by the
+running app through `lib/analysis-skills.ts` — so the same playbook can drive the implementation,
+the assistant's answers, and the review of the result.
