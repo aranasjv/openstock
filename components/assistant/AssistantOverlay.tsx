@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { X, Loader2, Sparkles } from 'lucide-react';
 import ChatPanel from '@/components/assistant/ChatPanel';
 import {
@@ -31,6 +32,7 @@ export default function AssistantOverlay() {
     const [conversation, setConversation] = useState<ConversationDetail | null>(null);
     const [providerLabel, setProviderLabel] = useState('assistant');
     const [error, setError] = useState<string | null>(null);
+    const pathname = usePathname();
 
     const { width, height, resizing, startResize } = useDragSize({
         storageKey: 'openstock:assistant-overlay:size',
@@ -85,7 +87,28 @@ export default function AssistantOverlay() {
         return () => window.removeEventListener('keydown', onKey);
     }, [open]);
 
-    if (!open) return null;
+    // The launcher replaces the per-dashboard "Ask AI" chips: one control, on every page, rather than
+    // a button in the two headers that remembered to add it and a third page that never would have.
+    //
+    // Hidden on /assistant, the one page where it would be noise — that page *is* the chat, so a
+    // button opening a panel duplicating it is just something to ignore. `startsWith` rather than
+    // equality so a conversation URL (`/assistant?c=…`) is covered, and the button sits at z-40 under
+    // the panel's z-50, so a resize cannot leave the two fighting over the same corner.
+    if (!open) {
+        if ((pathname ?? '').startsWith('/assistant')) return null;
+
+        return (
+            <button
+                type="button"
+                onClick={() => setOpen(true)}
+                aria-label="Open AI chat"
+                title="Ask AI"
+                className="fixed right-5 bottom-5 z-40 grid h-12 w-12 place-items-center rounded-full border border-teal-800/60 bg-teal-600/90 text-white shadow-lg transition-colors hover:bg-teal-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400"
+            >
+                <Sparkles className="h-5 w-5" aria-hidden="true" />
+            </button>
+        );
+    }
 
     return (
         <div

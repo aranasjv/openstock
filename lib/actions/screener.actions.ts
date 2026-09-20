@@ -34,6 +34,14 @@ const REQUEST_TIMEOUT_MS = 10_000;
 const CONCURRENCY = 4;
 
 /**
+ * How many ranked candidates get a company-name lookup.
+ *
+ * Finnhub's free tier allows 60 requests a minute and a scheduled run is cached for 24 hours, so this
+ * is a per-symbol-per-day cost rather than a per-render one — but a cold scan pays it all at once.
+ */
+const MAX_NAMED_CANDIDATES = 20;
+
+/**
  * The reference each run measures relative strength against: SPY for stocks, BTC for crypto.
  *
  * Returns null rather than throwing when it cannot be built. A missing benchmark costs one
@@ -290,14 +298,18 @@ async function runScreenerUncached(
     // Company names are resolved here, after the ranking, rather than inside the scan.
     //
     // A profile request per *scanned* symbol is one Finnhub call per symbol against a 60/minute free
-    // tier, so going from a 12-symbol scan to a 100-symbol one multiplies that cost by eight — for
-    // labels most rows never show, since the panel renders the matched ones. Only those are looked
-    // up, and a failure leaves the ticker, which is what the UI falls back to anyway. This is what
-    // makes a 100-symbol scan affordable.
+    // tier, so going from a 12-symbol scan to a 100-symbol one multiplies that cost by eight. Moving
+    // it out of the scan was not enough on its own: a 100-symbol run in a broad uptrend matches most
+    // of its universe, so the container log filled with "429 Too many requests" and those symbols
+    // stayed nameless until the next scan retried them and met the same wall.
+    //
+    // Capped to the head of the ranking, which is what the panel shows without scrolling far. Rows
+    // past the cap keep their ticker — the same fallback the UI already applies when a profile
+    // cannot be fetched, so the failure mode is a less friendly label rather than a missing row.
     if (assetType === 'stock') {
         await mapWithConcurrency(
-            candidates.filter((candidate) => candidate.matched > 0),
-            CONCURRENCY,
+            candidates.filter((candidate) => candidate.matched > 0).slice(0, MAX_NAMED_CANDIDATES),
+            3,
             async (candidate) => {
                 candidate.name = await getStockName(candidate.symbol);
             }
