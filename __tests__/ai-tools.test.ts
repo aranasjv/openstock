@@ -55,6 +55,9 @@ vi.mock('@/lib/analysis-skills', () => ({
     loadAnalysisSkill: (id: string, section?: string) => loadAnalysisSkill(id, section),
     getAnalysisSkillSummary: (id: string) => getAnalysisSkillSummary(id),
     listAnalysisSkills: () => listAnalysisSkills(),
+    // Mirrors the real composer: the bridge is prefixed to the main document only.
+    renderPlaybook: (doc: { body: string }, options?: { withBridge?: boolean }) =>
+        options?.withBridge === false ? doc.body : `BRIDGE\n\n---\n\n${doc.body}`,
 }));
 
 import { AI_TOOLS, getTool, getToolSpecs } from '@/lib/ai-tools';
@@ -325,5 +328,55 @@ describe('get_analysis_playbook', () => {
     it('requires the skill argument', async () => {
         const tool = getTool('get_analysis_playbook')!;
         await expect(tool.execute({}, { userId: 'u' })).rejects.toThrow('"skill" is required');
+    });
+
+    it('prepends the bridge to the main document', async () => {
+        getAnalysisSkillSummary.mockResolvedValue({
+            id: 'backtest-expert',
+            name: 'backtest-expert',
+            description: 'Backtesting.',
+            references: [],
+            hasScripts: true,
+        });
+        loadAnalysisSkill.mockResolvedValue({
+            id: 'backtest-expert',
+            name: 'backtest-expert',
+            description: 'Backtesting.',
+            body: '# Backtest Expert',
+        });
+
+        const tool = getTool('get_analysis_playbook')!;
+        const result = (await tool.execute({ skill: 'backtest-expert' }, { userId: 'u' })) as {
+            playbook: string;
+        };
+
+        // Without this the model reads "python3 scripts/..." and reports a run that never
+        // happened — the failure the whole bridge exists to prevent.
+        expect(result.playbook.startsWith('BRIDGE')).toBe(true);
+        expect(result.playbook).toContain('# Backtest Expert');
+    });
+
+    it('does not repeat the bridge on a reference section', async () => {
+        getAnalysisSkillSummary.mockResolvedValue({
+            id: 'position-sizer',
+            name: 'position-sizer',
+            description: 'Sizes positions.',
+            references: ['references/sizing_methodologies.md'],
+            hasScripts: true,
+        });
+        loadAnalysisSkill.mockResolvedValue({
+            id: 'position-sizer',
+            name: 'position-sizer',
+            description: 'Sizes positions.',
+            body: 'methodologies',
+        });
+
+        const tool = getTool('get_analysis_playbook')!;
+        const result = (await tool.execute(
+            { skill: 'position-sizer', section: 'references/sizing_methodologies.md' },
+            { userId: 'u' }
+        )) as { playbook: string };
+
+        expect(result.playbook).toBe('methodologies');
     });
 });

@@ -443,9 +443,8 @@ export const AI_TOOLS: AITool[] = [
             const section =
                 typeof args.section === 'string' && args.section.trim() ? args.section.trim() : undefined;
 
-            const { loadAnalysisSkill, getAnalysisSkillSummary, listAnalysisSkills } = await import(
-                '@/lib/analysis-skills'
-            );
+            const { loadAnalysisSkill, getAnalysisSkillSummary, listAnalysisSkills, renderPlaybook } =
+                await import('@/lib/analysis-skills');
 
             const summary = await getAnalysisSkillSummary(skill);
             if (!summary) {
@@ -470,7 +469,9 @@ export const AI_TOOLS: AITool[] = [
                 section: section ?? 'SKILL.md',
                 // Listed so the model can ask for a specific reference on a second call.
                 references: summary.references,
-                playbook: document.body,
+                // The bridge is prepended for the main document only. A reference section is a
+                // sub-document and does not need the "this is not a shell" preamble again.
+                playbook: renderPlaybook(document, { withBridge: !section }),
                 note: 'Vendored verbatim from the upstream project recorded in .agents/UPSTREAM.md. Follow it as written.',
             };
         },

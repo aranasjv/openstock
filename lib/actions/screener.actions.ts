@@ -352,7 +352,9 @@ export async function explainCandidate(
         let playbookUsed: string | undefined;
 
         if (playbookId) {
-            const { loadAnalysisSkill, getAnalysisSkillSummary } = await import('@/lib/analysis-skills');
+            const { loadAnalysisSkill, getAnalysisSkillSummary, renderPlaybook } = await import(
+                '@/lib/analysis-skills'
+            );
             const summary = await getAnalysisSkillSummary(playbookId);
 
             if (!summary) {
@@ -362,7 +364,9 @@ export async function explainCandidate(
             } else {
                 const document = await loadAnalysisSkill(playbookId);
                 if (document) {
-                    system = `${document.body.slice(0, MAX_PLAYBOOK_SYSTEM_CHARS)}\n\n---\n${EXPLAIN_GUARD}`;
+                    // Bridge first, so the model learns which tools replace the playbook's
+                    // scripts before reading instructions that assume a shell.
+                    system = `${renderPlaybook(document).slice(0, MAX_PLAYBOOK_SYSTEM_CHARS)}\n\n---\n${EXPLAIN_GUARD}`;
                     playbookUsed = document.id;
                 }
             }

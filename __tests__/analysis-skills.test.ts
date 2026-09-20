@@ -19,6 +19,8 @@ import {
     loadAnalysisSkill,
     resetAnalysisSkillCache,
     MAX_PLAYBOOK_CHARS,
+    getPlaybookBridge,
+    renderPlaybook,
 } from '@/lib/analysis-skills';
 
 const REAL_SKILLS_DIR = path.join(process.cwd(), '.agents', 'skills');
@@ -214,6 +216,65 @@ describe('the vendored playbooks', () => {
 
         const document = await loadAnalysisSkill('position-sizer');
         expect(document?.body.length).toBeGreaterThan(500);
+
+        delete process.env.ANALYSIS_SKILLS_DIR;
+    });
+});
+
+describe('the playbook bridge', () => {
+    // The playbooks were written for a CLI agent with Python; without the bridge the model
+    // reads "python3 scripts/..." and either claims a run that never happened or stalls.
+    it('tells every vendored playbook which tools replace the scripts', async () => {
+        process.env.ANALYSIS_SKILLS_DIR = REAL_SKILLS_DIR;
+        resetAnalysisSkillCache();
+
+        for (const skill of await listAnalysisSkills()) {
+            const bridge = getPlaybookBridge(skill.id);
+
+            expect(bridge).toContain('cannot execute anything');
+            expect(bridge).toContain('get_indicators');
+            expect(bridge).toContain('run_screener');
+            // The rule that matters most: a missing input is never estimated.
+            expect(bridge).toMatch(/not\s+available|missing input/);
+        }
+
+        delete process.env.ANALYSIS_SKILLS_DIR;
+    });
+
+    it('names the specific gap for playbooks whose data is genuinely absent', () => {
+        // Two of six crypto components need sources this app does not have.
+        expect(getPlaybookBridge('crypto-regime-analyzer')).toMatch(/dominance/i);
+        expect(getPlaybookBridge('crypto-regime-analyzer')).toMatch(/funding/i);
+
+        // Scoring three of seven CANSLIM components would look like a score and mean nothing.
+        expect(getPlaybookBridge('canslim-screener')).toMatch(/not assessed/i);
+
+        // The breadth series is not integrated; a proxy must be labelled as one.
+        expect(getPlaybookBridge('market-breadth-analyzer')).toMatch(/proxy/i);
+
+        // This one is a pure function of a ledger that does not exist.
+        expect(getPlaybookBridge('drawdown-circuit-breaker')).toMatch(/cannot (be evaluated|assess)/i);
+
+        // Sizing arithmetic must be shown, not asserted.
+        expect(getPlaybookBridge('position-sizer')).toMatch(/step by step/i);
+    });
+
+    it('falls back to the generic bridge for a playbook with no specific note', () => {
+        const bridge = getPlaybookBridge('technical-analyst');
+        expect(bridge).toContain('cannot execute anything');
+        expect(bridge).not.toMatch(/not integrated here/);
+    });
+
+    it('prepends the bridge to the body, and can be told not to', async () => {
+        process.env.ANALYSIS_SKILLS_DIR = REAL_SKILLS_DIR;
+        resetAnalysisSkillCache();
+
+        const document = (await loadAnalysisSkill('position-sizer'))!;
+        const rendered = renderPlaybook(document);
+
+        expect(rendered.startsWith('## Running this playbook in OpenStock')).toBe(true);
+        expect(rendered).toContain(document.body);
+        expect(renderPlaybook(document, { withBridge: false })).toBe(document.body);
 
         delete process.env.ANALYSIS_SKILLS_DIR;
     });

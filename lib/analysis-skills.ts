@@ -288,3 +288,100 @@ export async function loadAnalysisSkill(
     documentCache.set(cacheKey, document);
     return document;
 }
+
+// ── The bridge ─────────────────────────────────────────────────────
+//
+// The vendored playbooks were written for a CLI agent: 17 of the 23 tell the model to run
+// `python3 scripts/*.py`, read and write `state/`, and emit `reports/`. The runtime here is
+// node:20-alpine — no Python, no writable state directory, no shell. Handed a playbook
+// verbatim, a model either claims to have run a script that does not exist or stalls on a
+// file that will never appear, and either way the answer looks authoritative and is not.
+//
+// The bridge is the missing half: the same method, addressed to the tools that do exist. It
+// is prepended so it is read before the instructions it overrides, and it is explicit about
+// what cannot be fetched — an unavailable input must be reported as unavailable, never
+// estimated. `PROJECT_REVIEW.md` §2.1.
+
+const GENERIC_BRIDGE = `## Running this playbook in OpenStock
+
+This playbook was written for an agent with a shell, Python and a writable filesystem. You
+have none of those. \`scripts/\` is reference implementation, \`state/\` and \`reports/\` do not
+exist, and you cannot execute anything.
+
+So: apply the playbook's *method* — its thresholds, weights, gates and output shape — to
+values you compute from tool output. Never claim to have run a script, never ask the user to
+run one, and never present a script's expected output as if you had seen it.
+
+Map the inputs like this:
+- quotes and company/coin metadata → \`get_stock_quote\`, \`get_crypto_coin\`, \`get_crypto_markets\`
+- price history and indicators → \`get_indicators\` (SMA50/200, RSI14, MACD, 20-day high/low,
+  average volume, 5d/30d change, max drawdown, volatility)
+- screening → \`run_screener\` — its ranking is deterministic; report it, never re-score it
+- news → \`get_market_news\`
+- the user's own book → \`get_my_holdings\`, \`get_my_watchlist\`
+
+If the method needs an input none of those provide, name the missing input and what it would
+take to get it. An estimate presented as a measurement is the one outcome worse than "not
+available".`;
+
+const NO_BREADTH_SERIES = `Breadth note: the TraderMonty CSVs this playbook fetches are not integrated here. You can compute a *proxy* from \`run_screener\` and \`get_indicators\` — the share of the screener universe above its 200-day average, advancers against decliners, how many sit at 20-day highs — but label it a proxy over your sample, state the sample size, and never present it as the published series.`;
+
+const NO_FUNDAMENTALS = `Fundamentals note: OpenStock fetches quotes, profiles and price history, not financial statements. Growth, margins, institutional ownership and EPS surprise — the C, A and I components — cannot be sourced. Score only what the data supports and label the rest "not assessed"; defaulting them to zero would silently deflate the composite into a number that looks like a score and is not one.`;
+
+const NO_TRADE_STORE = `Storage note: OpenStock keeps no trade or thesis records yet. Everything this playbook reads from \`state/\` — open theses, the realised P&L ledger, MAE/MFE, the running win/loss count — is unavailable. Name which of those inputs a step needs, then stop. If the user supplies their own trades, apply the method to those instead.`;
+
+const NO_EARNINGS = `Earnings note: the Finnhub earnings calendar is not wired up here yet, so an imminent binary event cannot be detected. Treat "next earnings" as unknown and say so rather than estimating a date.`;
+
+const NO_MACRO = `Macro note: OpenStock has no rates, FX or commodity feed, so the playbook's macro inputs are unavailable and a full environment read is not possible. Describe the equity and crypto picture, list the macro inputs you would need, and stop there.`;
+
+const CRYPTO_REGIME_NOTE = `Crypto note: CoinGecko *is* integrated (markets, coin detail, price history) along with the Fear & Greed index. BTC dominance (\`/global\`) and Binance funding rates are **not**, so two of the six components — dominance trend, and leverage/funding — cannot be measured. Report the components you can and say explicitly which two are missing: the composite is not comparable to the playbook's zones without them.`;
+
+const SIZER_NOTE = `Arithmetic note: this playbook's output is a share count, so compute it step by step from the stated equity, entry and stop, apply the constraints in order, and show the inputs and the binding constraint in the answer. Never estimate a position size or round to something that looks tidy.`;
+
+const BACKTEST_NOTE = `Backtest note: there is no backtest engine here, and the data layer does not reach far enough to fake one — \`get_indicators\` needs 200 bars while the history window is one year, so a strategy would be judged on very few signals in a single regime. Do not simulate results in prose. Describe the hypothesis, what an engine would need, and stop.`;
+
+/**
+ * Playbook-specific bridge notes, only where the generic list is not enough: either the
+ * method depends on a source that is genuinely absent, or its arithmetic must be shown rather
+ * than asserted.
+ */
+const PLAYBOOK_NOTES: Record<string, string> = {
+    'market-breadth-analyzer': NO_BREADTH_SERIES,
+    'uptrend-analyzer': NO_BREADTH_SERIES,
+    'exposure-coach': `${NO_BREADTH_SERIES} It also consumes the uptrend series, which is likewise unavailable, so an exposure ceiling built on proxies must be presented as provisional.`,
+    'crypto-regime-analyzer': CRYPTO_REGIME_NOTE,
+    'earnings-calendar': NO_EARNINGS,
+    'pre-trade-discipline-gate': `${NO_TRADE_STORE} The event-risk check is also unavailable — there is no earnings feed.`,
+    'position-sizer': SIZER_NOTE,
+    'breakout-trade-planner': SIZER_NOTE,
+    'backtest-expert': BACKTEST_NOTE,
+    'vcp-screener': NO_FUNDAMENTALS,
+    'canslim-screener': NO_FUNDAMENTALS,
+    'market-environment-analysis': NO_MACRO,
+    'trader-memory-core': NO_TRADE_STORE,
+    'signal-postmortem': NO_TRADE_STORE,
+    'trade-performance-coach': NO_TRADE_STORE,
+    'weekly-performance-digest': NO_TRADE_STORE,
+    'drawdown-circuit-breaker': `${NO_TRADE_STORE} This gate is *specifically* a function of that ledger, so it cannot be evaluated at all yet — the honest output is "cannot assess", not a recommendation.`,
+};
+
+/** The generic preamble plus any playbook-specific mapping. */
+export function getPlaybookBridge(id: string): string {
+    const note = PLAYBOOK_NOTES[id];
+    return note ? `${GENERIC_BRIDGE}\n\n${note}` : GENERIC_BRIDGE;
+}
+
+/**
+ * The text to hand a model for a loaded playbook.
+ *
+ * The bridge is prepended only to the main document. A reference file is a sub-document, and
+ * repeating the "this is not a shell" preamble on every section would crowd out the section it
+ * is meant to introduce.
+ */
+export function renderPlaybook(
+    document: AnalysisSkillDocument,
+    options: { withBridge?: boolean } = {}
+): string {
+    if (options.withBridge === false) return document.body;
+    return `${getPlaybookBridge(document.id)}\n\n---\n\n${document.body}`;
+}
