@@ -24,29 +24,68 @@ docker compose up -d --build   # app + MongoDB
 
 ## Skills
 
-Project-scoped Agent Skills live in [`.agents/skills/`](.agents/skills/). Load one with
-`/<name>` or let it activate by description. They are the working procedures for this repo —
-read the relevant one **before** starting work in its area, not after.
+[`.agents/skills/`](.agents/skills/) contains **23 complete upstream Agent Skills, vendored
+verbatim** — not summaries. Load one with `/<name>` or let it activate by description; read
+the relevant one **before** starting work in its area.
 
-| Skill | Load it when |
+Provenance, licences, the exact upstream commits, and the list of what was deliberately *not*
+vendored are in [`.agents/UPSTREAM.md`](.agents/UPSTREAM.md). Read it before editing anything
+under `.agents/`. Refresh with `git clone --depth 1` + `cp -r`.
+
+### Analysis playbooks (tradermonty/claude-trading-skills, MIT)
+
+| Skill | Use it for |
 |---|---|
-| [`market-analysis`](.agents/skills/market-analysis/SKILL.md) | Reading market regime, breadth, rotation or an asset's condition; reviewing the watchlist/holdings. Defines the fetch-through-the-app rule and the report shape. |
-| [`trade-planning`](.agents/skills/trade-planning/SKILL.md) | Sizing a position, placing a stop, computing R-multiples/portfolio heat, running the pre-trade gate, or journalling a closed trade. |
-| [`openstock-development`](.agents/skills/openstock-development/SKILL.md) | Adding or refactoring code — the invariants, extension recipes (config key, AI tool, strategy, job, data source), and the Next.js performance rules that apply here. |
-| [`finance-dashboard-ux`](.agents/skills/finance-dashboard-ux/SKILL.md) | Building or reviewing any panel, table, chart or drawer — density, numeric readability, accessibility, motion and copy. |
+| [`crypto-regime-analyzer`](.agents/skills/crypto-regime-analyzer/SKILL.md) | Crypto risk-on/risk-off, BTC dominance, funding rates, alt-season reads. |
+| [`market-breadth-analyzer`](.agents/skills/market-breadth-analyzer/SKILL.md) / [`uptrend-analyzer`](.agents/skills/uptrend-analyzer/SKILL.md) | Breadth and participation — is a rally broad-based. |
+| [`exposure-coach`](.agents/skills/exposure-coach/SKILL.md) | Net-exposure ceiling and new-entry-allowed vs cash-priority posture. |
+| [`market-environment-analysis`](.agents/skills/market-environment-analysis/SKILL.md) / [`market-news-analyst`](.agents/skills/market-news-analyst/SKILL.md) | Global macro/risk-on-off environment; impact-ranked news review. |
+| [`technical-analyst`](.agents/skills/technical-analyst/SKILL.md) | Trend, support/resistance, scenario planning, invalidation levels. |
+| [`us-stock-analysis`](.agents/skills/us-stock-analysis/SKILL.md) | Full single-name review (fundamentals + technicals + report). |
+| [`vcp-screener`](.agents/skills/vcp-screener/SKILL.md) / [`canslim-screener`](.agents/skills/canslim-screener/SKILL.md) | Minervini VCP and O'Neil CANSLIM setups — the methodologies `lib/strategies.ts` draws on. |
+| [`breakout-trade-planner`](.agents/skills/breakout-trade-planner/SKILL.md) | Entry/stop/target plans from screener output. |
+| [`position-sizer`](.agents/skills/position-sizer/SKILL.md) / [`pre-trade-discipline-gate`](.agents/skills/pre-trade-discipline-gate/SKILL.md) / [`drawdown-circuit-breaker`](.agents/skills/drawdown-circuit-breaker/SKILL.md) | Risk-first sizing, the pre-trade checklist, account-level cooldowns. |
+| [`trader-memory-core`](.agents/skills/trader-memory-core/SKILL.md) / [`signal-postmortem`](.agents/skills/signal-postmortem/SKILL.md) / [`trade-performance-coach`](.agents/skills/trade-performance-coach/SKILL.md) / [`weekly-performance-digest`](.agents/skills/weekly-performance-digest/SKILL.md) | Thesis lifecycle, post-trade review, process-vs-outcome coaching, expectancy. |
+| [`backtest-expert`](.agents/skills/backtest-expert/SKILL.md) | Validating a strategy before trusting it — the screener is currently un-backtested. |
+| [`earnings-calendar`](.agents/skills/earnings-calendar/SKILL.md) | Event-risk dates. |
 
-Two of them are **substantive analysis tools**, not just conventions, and they exist because
-the methodology was already adopted in code: `lib/strategies.ts` adapts
-[tradermonty/claude-trading-skills](https://github.com/tradermonty/claude-trading-skills) (MIT).
-`market-analysis` and `trade-planning` carry that same methodology — breadth/regime scoring,
-risk-first sizing, the pre-trade gate — into the workflows around the app, so the reasoning is
-identical wherever it happens. `openstock-development` distils
-[vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills) performance rules;
-`finance-dashboard-ux` combines Vercel's review method with
-[anthropics/skills](https://github.com/anthropics/skills) frontend-design direction. All MIT —
-see each skill's `license` and `metadata.adapted-from`.
+### Development and design
 
-Verify they are discovered with `cmdc skills list` — a malformed skill is silently skipped.
+| Skill | Use it for |
+|---|---|
+| [`vercel-react-best-practices`](.agents/skills/vercel-react-best-practices/SKILL.md) | Writing, reviewing or refactoring React/Next.js — waterfalls, bundle, server-side performance, re-renders. |
+| [`web-design-guidelines`](.agents/skills/web-design-guidelines/SKILL.md) | UI/accessibility/UX review of a file or pattern. |
+| [`frontend-design`](.agents/skills/frontend-design/SKILL.md) | Aesthetic direction when building or reshaping UI. |
+
+Upstream ships Python helpers inside most trading skills. **This app does not run them** —
+there is no Python runtime in the image. They are vendored because they are part of the skill
+and document exactly how each method computes its numbers.
+
+### The same playbooks drive the app
+
+The skills are not just for agents editing the repo — the running app reads the same files
+through [`lib/analysis-skills.ts`](lib/analysis-skills.ts), so its AI uses the real
+methodology rather than a paraphrase:
+
+- **Chat** — the assistant's system prompt lists every playbook, and the
+  `get_analysis_playbook` tool pulls one on demand (`lib/ai-chat.ts`, `lib/ai-tools.ts`).
+  Playbook reads get a larger result budget than ordinary data because a half-read
+  methodology is useless.
+- **Explain** — `/settings → Explain: analysis playbook` (`ANALYSIS_PLAYBOOK`) makes the
+  screener's per-candidate "Explain" action use a chosen playbook as its system prompt,
+  capped at 12k chars and always wrapped in the app's not-advice guard
+  (`explainCandidate` in `lib/actions/screener.actions.ts`).
+- `/api/health` reports the number of playbooks it loaded, so a deployment that failed to
+  ship `.agents` is visible rather than silent. The **Dockerfile copies `.agents`** into the
+  runtime image for exactly this reason — Next's standalone tracing follows imports, not
+  directories read with `fs`.
+
+The catalogue is a directory scan, cached per process: adding or removing a skill directory
+needs no code change. Ids are validated (`^[a-z0-9][a-z0-9-]*$`) and reads are confined to the
+skill's own directory, so the loader cannot be used to read outside `.agents/skills`.
+
+Verify discovery with `cmdc skills list` — a malformed skill (name ≠ directory) is skipped
+with a warning.
 
 ## Architecture map
 
@@ -67,7 +106,8 @@ lib/
   config.ts            runtime configuration schema + loader   ← read this first
   ai-provider.ts       provider abstraction + tool-calling dialects
   ai-chat.ts           assistant tool loop + system prompt
-  ai-tools.ts          the 9 read-only tools the assistant may call
+  ai-tools.ts          the 10 read-only tools the assistant may call
+  analysis-skills.ts   reads the vendored playbooks in .agents/skills for the app
   rate-limit.ts        in-process sliding-window limiter (AI spend)
   screener-cache.ts    in-process TTL cache of screener results
   strategies.ts        deterministic screener rules (the source of truth)

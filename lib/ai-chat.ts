@@ -7,6 +7,7 @@ import {
     type AIToolCall,
 } from '@/lib/ai-provider';
 import { getTool, getToolSpecs, type AIToolContext } from '@/lib/ai-tools';
+import { listAnalysisSkills } from '@/lib/analysis-skills';
 import { loadConfig } from '@/lib/config';
 
 /**
@@ -34,6 +35,17 @@ const TOOL_TIMEOUT_MS = 20_000;
 
 /** Tool output is fed back into the model's context, so it is truncated rather than unbounded. */
 const MAX_TOOL_RESULT_CHARS = 6_000;
+
+/**
+ * Analysis playbooks are read whole — a methodology cut off mid-way is worse than useless —
+ * so the vendored skills get a larger budget than ordinary data results. Still bounded: the
+ * largest vendored playbook is ~18KB, and the model only pulls one when it needs it.
+ */
+const MAX_PLAYBOOK_RESULT_CHARS = 24_000;
+const PLAYBOOK_TOOL = 'get_analysis_playbook';
+
+/** How much of each playbook description goes into the system prompt. */
+const PLAYBOOK_DESCRIPTION_CHARS = 180;
 
 export interface ToolTraceEntry {
     name: string;
@@ -93,7 +105,37 @@ function summarise(result: unknown): string {
  * The system prompt. Two jobs: stop the model inventing market data, and keep it inside the
  * same not-advice boundary the rest of the app uses.
  */
-export function buildAssistantSystemPrompt(context: { date: string; defaultStrategy: string }): string {
+export function buildAssistantSystemPrompt(context: {
+    date: string;
+    defaultStrategy: string;
+    /** The vendored playbooks, listed so the model knows what it can pull. */
+    playbooks?: { id: string; description: string }[];
+}): string {
+    const playbooks = context.playbooks ?? [];
+
+    const playbookSection =
+        playbooks.length === 0
+            ? []
+            : [
+                  '',
+                  'ANALYSIS PLAYBOOKS:',
+                  'This repo vendors complete analysis playbooks (from tradermonty/claude-trading-skills,',
+                  'MIT — see .agents/UPSTREAM.md). When a question calls for one, call',
+                  `${PLAYBOOK_TOOL} with its id FIRST, then follow it exactly. Pass a listed "section" for`,
+                  'the deeper reference document when the main playbook points at one.',
+                  '- Do not paraphrase a playbook back to the user. Apply it to the data you fetched.',
+                  '- A playbook is a methodology, not a source of figures. Its example numbers are',
+                  '  illustrative — every figure you report must still come from a tool call.',
+                  '',
+                  ...playbooks.map((playbook) => {
+                      const description =
+                          playbook.description.length > PLAYBOOK_DESCRIPTION_CHARS
+                              ? `${playbook.description.slice(0, PLAYBOOK_DESCRIPTION_CHARS)}…`
+                              : playbook.description;
+                      return `- ${playbook.id}: ${description}`;
+                  }),
+              ];
+
     return [
         'You are the analysis assistant inside OpenStock, a market dashboard covering stocks and crypto.',
         '',
@@ -124,6 +166,7 @@ export function buildAssistantSystemPrompt(context: { date: string; defaultStrat
         'When the user asks about "the market", "what to buy", or wants suggestions, call',
         'run_screener for both asset types and report the flagged candidates with their scores and',
         'the conditions they met, plus the standing disclaimer.',
+        ...playbookSection,
     ].join('\n');
 }
 
@@ -145,9 +188,16 @@ export async function runChatTurn({
     const config = await loadConfig();
     const providerName = (provider || (config.AI_PROVIDER as AIProviderName) || 'gemini') as AIProviderName;
 
+    // The catalogue is a directory scan, cached after the first turn. If it fails (no
+    // .agents directory in some deployment) the assistant still works, just without playbooks.
+    const playbooks = await listAnalysisSkills()
+        .then((skills) => skills.map((skill) => ({ id: skill.id, description: skill.description })))
+        .catch(() => []);
+
     const system = buildAssistantSystemPrompt({
         date: new Date().toISOString().slice(0, 10),
         defaultStrategy: config.SCREENER_STRATEGY || 'trend-following',
+        playbooks,
     });
 
     const tools = getToolSpecs();
@@ -240,9 +290,12 @@ export async function runChatTurn({
                 );
 
                 const serialised = JSON.stringify(result);
+                // A playbook is read whole; everything else keeps the tighter data budget.
+                const budget =
+                    call.name === PLAYBOOK_TOOL ? MAX_PLAYBOOK_RESULT_CHARS : MAX_TOOL_RESULT_CHARS;
                 const truncated =
-                    serialised.length > MAX_TOOL_RESULT_CHARS
-                        ? `${serialised.slice(0, MAX_TOOL_RESULT_CHARS)}… (truncated)`
+                    serialised.length > budget
+                        ? `${serialised.slice(0, budget)}… (truncated)`
                         : serialised;
 
                 toolTrace.push({

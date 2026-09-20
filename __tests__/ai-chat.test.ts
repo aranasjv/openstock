@@ -26,6 +26,12 @@ vi.mock('@/lib/ai-tools', () => ({
     getToolSpecs: () => getToolSpecs(),
 }));
 
+const listAnalysisSkills = vi.fn();
+
+vi.mock('@/lib/analysis-skills', () => ({
+    listAnalysisSkills: () => listAnalysisSkills(),
+}));
+
 let configValues: Record<string, string> = {};
 vi.mock('@/lib/config', () => ({
     loadConfig: async () => configValues,
@@ -35,13 +41,17 @@ import { runChatTurn, buildAssistantSystemPrompt } from '@/lib/ai-chat';
 
 let echoExecute: ReturnType<typeof vi.fn>;
 let echoTool: { spec: Record<string, unknown>; execute: typeof echoExecute };
+let playbookExecute: ReturnType<typeof vi.fn>;
+let playbookTool: { spec: Record<string, unknown>; execute: typeof playbookExecute };
 
 beforeEach(() => {
     callAIProviderWithTools.mockReset();
     getTool.mockReset();
     getToolSpecs.mockReset();
+    listAnalysisSkills.mockReset();
 
     configValues = { AI_PROVIDER: 'deepseek', SCREENER_STRATEGY: 'trend-following' };
+    listAnalysisSkills.mockResolvedValue([]);
 
     echoExecute = vi.fn(async (args: Record<string, unknown>) => ({ echoed: args.value }));
     echoTool = {
@@ -53,8 +63,22 @@ beforeEach(() => {
         execute: echoExecute,
     };
 
-    getToolSpecs.mockReturnValue([echoTool.spec]);
-    getTool.mockImplementation((name: string) => (name === 'echo' ? echoTool : undefined));
+    playbookExecute = vi.fn(async () => ({ playbook: 'x'.repeat(10_000) + 'END-OF-PLAYBOOK' }));
+    playbookTool = {
+        spec: {
+            name: 'get_analysis_playbook',
+            description: 'Load a playbook.',
+            parameters: { type: 'object', properties: {} },
+        },
+        execute: playbookExecute,
+    };
+
+    getToolSpecs.mockReturnValue([echoTool.spec, playbookTool.spec]);
+    getTool.mockImplementation((name: string) => {
+        if (name === 'echo') return echoTool;
+        if (name === 'get_analysis_playbook') return playbookTool;
+        return undefined;
+    });
 });
 
 describe('runChatTurn', () => {
@@ -204,5 +228,79 @@ describe('buildAssistantSystemPrompt', () => {
 
     it('defers to the deterministic screener ranking', () => {
         expect(prompt).toMatch(/do not re-rank/);
+    });
+});
+
+describe('analysis playbook wiring', () => {
+    it('lists the vendored playbooks in the system prompt', async () => {
+        listAnalysisSkills.mockResolvedValue([
+            {
+                id: 'position-sizer',
+                name: 'position-sizer',
+                description: 'Risk-based position sizing for long trades.',
+                references: [],
+                hasScripts: false,
+            },
+        ]);
+        callAIProviderWithTools.mockResolvedValue({ content: 'ok' });
+
+        await runChatTurn({ history: [{ role: 'user', content: 'size this' }], userId: 'u' });
+
+        const [messages] = callAIProviderWithTools.mock.calls[0];
+        const system = messages[0].content as string;
+        expect(system).toContain('ANALYSIS PLAYBOOKS');
+        expect(system).toContain('- position-sizer: Risk-based position sizing');
+        // The model must be told which tool to call to pull one.
+        expect(system).toContain('get_analysis_playbook');
+    });
+
+    it('omits the playbook section when none are installed', () => {
+        const prompt = buildAssistantSystemPrompt({ date: '2026-01-01', defaultStrategy: 'trend-following' });
+        expect(prompt).not.toContain('ANALYSIS PLAYBOOKS');
+    });
+
+    it('trims an over-long playbook description', () => {
+        const prompt = buildAssistantSystemPrompt({
+            date: '2026-01-01',
+            defaultStrategy: 'trend-following',
+            playbooks: [{ id: 'big', description: 'y'.repeat(500) }],
+        });
+        expect(prompt).toContain('- big: y');
+        expect(prompt).not.toContain('y'.repeat(500));
+    });
+
+    it('does not truncate a playbook result the way it truncates data', async () => {
+        callAIProviderWithTools
+            .mockResolvedValueOnce({
+                content: '',
+                toolCalls: [{ id: 'p1', name: 'get_analysis_playbook', arguments: '{}' }],
+            })
+            .mockResolvedValueOnce({ content: 'done' });
+
+        await runChatTurn({ history: [{ role: 'user', content: 'q' }], userId: 'u' });
+
+        const toolMessage = callAIProviderWithTools.mock.calls[1][0].find(
+            (m: { role: string }) => m.role === 'tool'
+        );
+        // The playbook gets the larger budget, so the tail of a 10k body survives.
+        expect(toolMessage.content).toContain('END-OF-PLAYBOOK');
+    });
+
+    it('still caps an ordinary tool result at the data budget', async () => {
+        echoExecute.mockResolvedValueOnce({ big: 'z'.repeat(10_000) + 'END-OF-ECHO' });
+        callAIProviderWithTools
+            .mockResolvedValueOnce({
+                content: '',
+                toolCalls: [{ id: 'e1', name: 'echo', arguments: '{}' }],
+            })
+            .mockResolvedValueOnce({ content: 'done' });
+
+        await runChatTurn({ history: [{ role: 'user', content: 'q' }], userId: 'u' });
+
+        const toolMessage = callAIProviderWithTools.mock.calls[1][0].find(
+            (m: { role: string }) => m.role === 'tool'
+        );
+        expect(toolMessage.content).toContain('truncated');
+        expect(toolMessage.content).not.toContain('END-OF-ECHO');
     });
 });

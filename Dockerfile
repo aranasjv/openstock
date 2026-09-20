@@ -32,6 +32,12 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# The analysis playbooks the assistant reads at runtime (lib/analysis-skills.ts). Next's
+# standalone tracing only follows imported modules, not directories read with fs — without
+# this COPY the container has no .agents at all and the assistant silently loses its
+# playbooks while working fine in dev.
+COPY --from=builder --chown=nextjs:nodejs /app/.agents ./.agents
+
 USER nextjs
 
 EXPOSE 3000

@@ -45,6 +45,16 @@ vi.mock('@/lib/actions/screener.actions', () => ({
     runScreener: (assetType: string, strategy?: string) => runScreener(assetType, strategy),
 }));
 
+const loadAnalysisSkill = vi.fn();
+const getAnalysisSkillSummary = vi.fn();
+const listAnalysisSkills = vi.fn();
+
+vi.mock('@/lib/analysis-skills', () => ({
+    loadAnalysisSkill: (id: string, section?: string) => loadAnalysisSkill(id, section),
+    getAnalysisSkillSummary: (id: string) => getAnalysisSkillSummary(id),
+    listAnalysisSkills: () => listAnalysisSkills(),
+}));
+
 import { AI_TOOLS, getTool, getToolSpecs } from '@/lib/ai-tools';
 
 /** Names that would indicate a mutating tool slipped into the read-only registry. */
@@ -55,9 +65,9 @@ beforeEach(() => {
 });
 
 describe('tool registry shape', () => {
-    it('exposes nine tools', () => {
-        expect(getToolSpecs()).toHaveLength(9);
-        expect(AI_TOOLS).toHaveLength(9);
+    it('exposes ten tools', () => {
+        expect(getToolSpecs()).toHaveLength(10);
+        expect(AI_TOOLS).toHaveLength(10);
     });
 
     it('gives every tool a unique, non-empty name and description', () => {
@@ -221,5 +231,97 @@ describe('run_screener', () => {
         expect(result.candidates).toHaveLength(1);
         expect(result.candidates[0]).toMatchObject({ symbol: 'AAPL', conditionsMet: '3/3' });
         expect(result.disclaimer).toContain('not investment advice');
+    });
+});
+
+describe('get_analysis_playbook', () => {
+    it('returns the playbook body and its available references', async () => {
+        getAnalysisSkillSummary.mockResolvedValue({
+            id: 'position-sizer',
+            name: 'position-sizer',
+            description: 'Sizes positions.',
+            references: ['references/sizing_methodologies.md'],
+            hasScripts: true,
+        });
+        loadAnalysisSkill.mockResolvedValue({
+            id: 'position-sizer',
+            name: 'position-sizer',
+            description: 'Sizes positions.',
+            body: '# Position Sizer\n\nRisk-based sizing.',
+        });
+
+        const tool = getTool('get_analysis_playbook')!;
+        const result = (await tool.execute({ skill: 'position-sizer' }, { userId: 'u' })) as {
+            skill: string;
+            section: string;
+            references: string[];
+            playbook: string;
+        };
+
+        expect(loadAnalysisSkill).toHaveBeenCalledWith('position-sizer', undefined);
+        expect(result.section).toBe('SKILL.md');
+        expect(result.playbook).toContain('Risk-based sizing.');
+        expect(result.references).toEqual(['references/sizing_methodologies.md']);
+    });
+
+    it('passes a requested section through', async () => {
+        getAnalysisSkillSummary.mockResolvedValue({
+            id: 'position-sizer',
+            name: 'position-sizer',
+            description: 'Sizes positions.',
+            references: ['references/sizing_methodologies.md'],
+            hasScripts: false,
+        });
+        loadAnalysisSkill.mockResolvedValue({
+            id: 'position-sizer',
+            name: 'position-sizer',
+            description: 'Sizes positions.',
+            body: 'methodologies',
+        });
+
+        const tool = getTool('get_analysis_playbook')!;
+        await tool.execute(
+            { skill: 'position-sizer', section: 'references/sizing_methodologies.md' },
+            { userId: 'u' }
+        );
+
+        expect(loadAnalysisSkill).toHaveBeenCalledWith(
+            'position-sizer',
+            'references/sizing_methodologies.md'
+        );
+    });
+
+    it('lists the available ids when the playbook is unknown', async () => {
+        getAnalysisSkillSummary.mockResolvedValue(null);
+        listAnalysisSkills.mockResolvedValue([
+            { id: 'position-sizer', name: 'position-sizer', description: '', references: [], hasScripts: false },
+            { id: 'backtest-expert', name: 'backtest-expert', description: '', references: [], hasScripts: false },
+        ]);
+
+        const tool = getTool('get_analysis_playbook')!;
+        await expect(tool.execute({ skill: 'nope' }, { userId: 'u' })).rejects.toThrow(
+            /Available playbooks: position-sizer, backtest-expert/
+        );
+    });
+
+    it('rejects a section the playbook does not have', async () => {
+        getAnalysisSkillSummary.mockResolvedValue({
+            id: 'backtest-expert',
+            name: 'backtest-expert',
+            description: 'Backtesting.',
+            references: [],
+            hasScripts: false,
+        });
+        loadAnalysisSkill.mockResolvedValue(null);
+
+        const tool = getTool('get_analysis_playbook')!;
+        await expect(
+            tool.execute({ skill: 'backtest-expert', section: 'references/nope.md' }, { userId: 'u' })
+        ).rejects.toThrow(/no section/);
+    });
+
+    it('requires the skill argument', async () => {
+        const tool = getTool('get_analysis_playbook')!;
+        await expect(tool.execute({}, { userId: 'u' })).rejects.toThrow('"skill" is required');
     });
 });

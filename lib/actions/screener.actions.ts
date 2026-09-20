@@ -31,6 +31,18 @@ const DEFAULT_YAHOO_CHART_BASE = 'https://query1.finance.yahoo.com/v8/finance/ch
 const REQUEST_TIMEOUT_MS = 10_000;
 const CONCURRENCY = 4;
 
+/** A playbook used as an explanation persona is capped so one call cannot blow up the bill. */
+const MAX_PLAYBOOK_SYSTEM_CHARS = 12_000;
+
+/**
+ * Kept alongside whichever playbook is selected: the vendored playbooks are general-purpose
+ * and shipped for other data sources, so the app's own boundary is restated on top of them.
+ */
+const EXPLAIN_GUARD =
+    'OpenStock boundary: report conditions, measured values and invalidation levels only. ' +
+    'Never give buy/sell/hold advice or price targets. Every figure must come from the data ' +
+    'supplied below, never from memory.';
+
 export interface ScreenerCandidate {
     /** Route key: CoinGecko id for crypto, ticker for stocks. */
     symbol: string;
@@ -301,7 +313,15 @@ export async function explainCandidate(
     assetType: 'stock' | 'crypto',
     symbol: string,
     strategyIdInput: string
-): Promise<{ ok: boolean; text?: string; error?: string; framework?: string; provider?: string }> {
+): Promise<{
+    ok: boolean;
+    text?: string;
+    error?: string;
+    framework?: string;
+    /** Set when a vendored playbook was used as the explanation persona. */
+    playbook?: string;
+    provider?: string;
+}> {
     const strategyId: StrategyId = isStrategyId(strategyIdInput) ? strategyIdInput : DEFAULT_STRATEGY_ID;
 
     try {
@@ -324,6 +344,30 @@ export async function explainCandidate(
         // The framework comes from the same runtime config as everything else.
         const framework = getTraderFramework(config.TRADER_FRAMEWORK);
 
+        // Optionally superseded by one of the full playbooks vendored under .agents/skills.
+        // The playbook replaces the persona rather than stacking on it — the upstream
+        // playbooks define their own output structure and would otherwise be contradicted.
+        const playbookId = (config.ANALYSIS_PLAYBOOK || '').trim();
+        let system = framework.system;
+        let playbookUsed: string | undefined;
+
+        if (playbookId) {
+            const { loadAnalysisSkill, getAnalysisSkillSummary } = await import('@/lib/analysis-skills');
+            const summary = await getAnalysisSkillSummary(playbookId);
+
+            if (!summary) {
+                console.warn(
+                    `explainCandidate: ANALYSIS_PLAYBOOK "${playbookId}" is not a vendored playbook; using the built-in framework.`
+                );
+            } else {
+                const document = await loadAnalysisSkill(playbookId);
+                if (document) {
+                    system = `${document.body.slice(0, MAX_PLAYBOOK_SYSTEM_CHARS)}\n\n---\n${EXPLAIN_GUARD}`;
+                    playbookUsed = document.id;
+                }
+            }
+        }
+
         const prompt = buildCandidatePrompt({
             symbol,
             assetType,
@@ -338,11 +382,17 @@ export async function explainCandidate(
 
         const { callAIProvider } = await import('@/lib/ai-provider');
         const text = await callAIProvider(prompt, providerName, {
-            system: framework.system,
+            system,
             temperature: framework.temperature,
         });
 
-        return { ok: true, text: text.trim(), framework: framework.name, provider: providerName };
+        return {
+            ok: true,
+            text: text.trim(),
+            framework: framework.name,
+            playbook: playbookUsed,
+            provider: providerName,
+        };
     } catch (error) {
         console.error('explainCandidate failed:', error);
         return {

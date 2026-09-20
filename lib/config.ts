@@ -76,6 +76,15 @@ export const CONFIG_SCHEMA: SettingDef[] = [
         type: 'select',
         options: ['technical-analyst', 'plain'],
     },
+    {
+        key: 'ANALYSIS_PLAYBOOK',
+        group: 'ai',
+        env: ['ANALYSIS_PLAYBOOK'],
+        label: 'Explain: analysis playbook',
+        description:
+            'Optional. Overrides the framework above with one of the full playbooks vendored under .agents/skills — for example "technical-analyst", "us-stock-analysis" or "position-sizer". The playbook is sent as the system prompt, so it costs more per explanation than the built-in framework. Leave blank to use the framework.',
+        default: '',
+    },
 
     // ── Market data ─────────────────────────────────────────────────
     {

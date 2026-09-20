@@ -413,6 +413,65 @@ export const AI_TOOLS: AITool[] = [
             };
         },
     },
+
+    {
+        spec: {
+            name: 'get_analysis_playbook',
+            description:
+                'Load one of the analysis playbooks vendored under .agents/skills — position sizing, market regime, technical analysis, CANSLIM/VCP screening, trade journaling, postmortems, backtesting. Call this BEFORE performing that kind of analysis, then follow the playbook. The available ids are listed in your system prompt.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    skill: {
+                        type: 'string',
+                        description: 'Playbook id, e.g. "position-sizer", "crypto-regime-analyzer", "technical-analyst".',
+                    },
+                    section: {
+                        type: 'string',
+                        description:
+                            'Optional reference document inside the playbook, e.g. "references/sizing_methodologies.md". Omit for the main playbook.',
+                    },
+                },
+                required: ['skill'],
+            },
+        },
+        execute: async (args) => {
+            const skill = str(args, 'skill').toLowerCase();
+            const section =
+                typeof args.section === 'string' && args.section.trim() ? args.section.trim() : undefined;
+
+            const { loadAnalysisSkill, getAnalysisSkillSummary, listAnalysisSkills } = await import(
+                '@/lib/analysis-skills'
+            );
+
+            const summary = await getAnalysisSkillSummary(skill);
+            if (!summary) {
+                const available = (await listAnalysisSkills()).map((entry) => entry.id);
+                throw new Error(
+                    `No playbook "${skill}". Available playbooks: ${available.join(', ')}.`
+                );
+            }
+
+            const document = await loadAnalysisSkill(skill, section);
+            if (!document) {
+                throw new Error(
+                    section
+                        ? `Playbook "${skill}" has no section "${section}". Available: ${summary.references.join(', ') || 'none'}.`
+                        : `Playbook "${skill}" could not be read.`
+                );
+            }
+
+            return {
+                skill: document.id,
+                name: document.name,
+                section: section ?? 'SKILL.md',
+                // Listed so the model can ask for a specific reference on a second call.
+                references: summary.references,
+                playbook: document.body,
+                note: 'Vendored verbatim from the upstream project recorded in .agents/UPSTREAM.md. Follow it as written.',
+            };
+        },
+    },
 ];
 
 const TOOL_BY_NAME = new Map(AI_TOOLS.map((tool) => [tool.spec.name, tool]));

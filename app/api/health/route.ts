@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/database/mongoose';
 import { getJobState, JOB_ALERTS, JOB_DIGEST } from '@/lib/scheduler';
+import { listAnalysisSkills } from '@/lib/analysis-skills';
 
 /**
  * Liveness and readiness probe.
@@ -77,6 +78,10 @@ export async function GET() {
         console.error('Health check failed to reach MongoDB:', error);
     }
 
+    // The playbooks are read from disk, and a deployment that forgot to ship .agents is a
+    // degraded but valid state — reporting the count makes that visible instead of silent.
+    const analysisSkills = await listAnalysisSkills().catch(() => []);
+
     return NextResponse.json(
         {
             ok: db === 'up',
@@ -85,6 +90,10 @@ export async function GET() {
             uptimeSeconds: Math.round(process.uptime()),
             db,
             checkLatencyMs: Date.now() - startedAt,
+            analysisPlaybooks: {
+                count: analysisSkills.length,
+                ids: analysisSkills.map((skill) => skill.id),
+            },
             jobs,
         },
         { status: db === 'up' ? 200 : 503, headers: { 'Cache-Control': 'no-store' } }

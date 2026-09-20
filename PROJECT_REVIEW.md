@@ -3,11 +3,14 @@
 A one-off, thorough review of OpenStock through three lenses. Every finding is grounded in a
 `file:line` that was read, not inferred. Severity: **blocker** · **major** · **minor**.
 
-Reviewed with the project skills in [`.agents/skills/`](.agents/skills/):
+Reviewed with the skills vendored in [`.agents/skills/`](.agents/skills/) (see
+[`.agents/UPSTREAM.md`](.agents/UPSTREAM.md) for provenance):
 
-- `market-analysis` / `trade-planning` → **new features** ([§2](#2-new-features--trading--market-analysis))
-- `openstock-development` → **architecture gaps** ([§1](#1-architecture--development-lens))
-- `finance-dashboard-ux` → **UI/UX** ([§3](#3-uiux))
+- `market-breadth-analyzer` / `uptrend-analyzer` / `exposure-coach` / `crypto-regime-analyzer`,
+  plus `position-sizer`, `pre-trade-discipline-gate`, `trader-memory-core` → **new features**
+  ([§2](#2-new-features--trading--market-analysis))
+- `vercel-react-best-practices` → **architecture gaps** ([§1](#1-architecture--development-lens))
+- `web-design-guidelines` / `frontend-design` → **UI/UX** ([§3](#3-uiux))
 
 ---
 
@@ -106,8 +109,8 @@ existing data layer can support it (i.e. no new vendor required).
 The app scores a whole universe but never aggregates it. A regime panel turns the screener
 into a market read: % of the universe above its 200-day average, % in golden cross, %
 at 20-day highs, net advancers — scored and banded into **risk-on / neutral / defensive /
-risk-off**. `market-analysis/references/regime-framework.md` already defines the exact
-scoring, so the logic is written.
+risk-off**. The vendored `market-breadth-analyzer`, `uptrend-analyzer` and `exposure-coach`
+playbooks already define the scoring, so the logic is written.
 **Files:** new `lib/regime.ts` over `runScreener` + `get_indicators`; a panel on both
 dashboards; a new assistant tool `get_market_regime`.
 
@@ -122,7 +125,7 @@ holdings page and the `get_my_holdings` tool output.
 ### F3 — Position sizing calculator · *high value, low effort, no new data*
 Entry/stop come from `low20`/`volatility` already returned by `get_indicators`; account equity
 and risk % are user inputs. Produces shares, $ risk, R-multiples and portfolio heat — the
-`trade-planning` skill defines the exact maths. Highest value-to-effort item here.
+vendored `position-sizer` playbook defines the exact maths. Highest value-to-effort item here.
 **Files:** new `lib/position-sizing.ts` (pure, unit-testable); a small panel/drawer; wire the
 stop/target into the existing alert creation.
 
@@ -150,7 +153,7 @@ as "−8%" / "2R from entry", makes the plan from F3 actionable.
 
 ### F7 — Earnings & economic calendar · *medium value, medium effort, new provider call*
 Finnhub exposes an earnings calendar (unused here). It would let the screener and alerts warn
-about binary event risk — the one gate item in `trade-planning/references/checklists.md` that
+about binary event risk — the one gate item in the `pre-trade-discipline-gate` playbook that
 is currently always "unknown".
 **Files:** `lib/actions/finnhub.actions.ts` + a calendar surface.
 
@@ -181,7 +184,7 @@ handler with `Content-Disposition` is enough.
 
 ## 3. UI/UX
 
-Verified against `finance-dashboard-ux`. Note the palette is customised in `app/globals.css:118-122`:
+Verified against `web-design-guidelines`. Note the palette is customised in `app/globals.css:118-122`:
 `gray-900 #050505`, `gray-800 #141414`, `gray-700 #212328`, `gray-600 #30333A`, `gray-500 #9095A1`.
 That changes the contrast maths materially: **`gray-500` is ~6.8:1 (fine)**, but
 **`gray-600` is ~1.6:1 and `gray-700` ~1.2:1 — effectively invisible.**
@@ -236,7 +239,8 @@ they are a generated-page tell and, at `gray-700`, currently invisible anyway.
 | **P2 — then** | U3–U8, F3 + F1 (sizing and regime — highest value-per-effort features), A6, A10, F5. |
 | **P3 — later** | F2, F4, F6–F10, remaining minors. |
 
-The methodology each item should be implemented against already lives in the skills: sizing
-and the pre-trade gate in `trade-planning`, regime scoring in
-`market-analysis/references/regime-framework.md`, and the invariants and extension recipes for
-all of it in `openstock-development`.
+The methodology each item should be implemented against already lives in the vendored skills:
+sizing in `position-sizer`, the gate in `pre-trade-discipline-gate`, regime scoring in
+`market-breadth-analyzer` / `uptrend-analyzer` / `exposure-coach`, and the repo invariants and
+extension recipes for all of it in `AGENTS.md`. The running app can read any of them through
+`lib/analysis-skills.ts`, so the same methodology drives both the code and the assistant.
