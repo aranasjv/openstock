@@ -22,6 +22,32 @@ npm run lint       # eslint — see "Known debt" below before trusting a clean r
 docker compose up -d --build   # app + MongoDB
 ```
 
+## Skills
+
+Project-scoped Agent Skills live in [`.agents/skills/`](.agents/skills/). Load one with
+`/<name>` or let it activate by description. They are the working procedures for this repo —
+read the relevant one **before** starting work in its area, not after.
+
+| Skill | Load it when |
+|---|---|
+| [`market-analysis`](.agents/skills/market-analysis/SKILL.md) | Reading market regime, breadth, rotation or an asset's condition; reviewing the watchlist/holdings. Defines the fetch-through-the-app rule and the report shape. |
+| [`trade-planning`](.agents/skills/trade-planning/SKILL.md) | Sizing a position, placing a stop, computing R-multiples/portfolio heat, running the pre-trade gate, or journalling a closed trade. |
+| [`openstock-development`](.agents/skills/openstock-development/SKILL.md) | Adding or refactoring code — the invariants, extension recipes (config key, AI tool, strategy, job, data source), and the Next.js performance rules that apply here. |
+| [`finance-dashboard-ux`](.agents/skills/finance-dashboard-ux/SKILL.md) | Building or reviewing any panel, table, chart or drawer — density, numeric readability, accessibility, motion and copy. |
+
+Two of them are **substantive analysis tools**, not just conventions, and they exist because
+the methodology was already adopted in code: `lib/strategies.ts` adapts
+[tradermonty/claude-trading-skills](https://github.com/tradermonty/claude-trading-skills) (MIT).
+`market-analysis` and `trade-planning` carry that same methodology — breadth/regime scoring,
+risk-first sizing, the pre-trade gate — into the workflows around the app, so the reasoning is
+identical wherever it happens. `openstock-development` distils
+[vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills) performance rules;
+`finance-dashboard-ux` combines Vercel's review method with
+[anthropics/skills](https://github.com/anthropics/skills) frontend-design direction. All MIT —
+see each skill's `license` and `metadata.adapted-from`.
+
+Verify they are discovered with `cmdc skills list` — a malformed skill is silently skipped.
+
 ## Architecture map
 
 ```
