@@ -481,6 +481,18 @@ export const POPULAR_CRYPTO_IDS = [
     'dogwifcoin',
 ];
 
+/**
+ * The stock universe the screener scans, roughly in order of liquidity.
+ *
+ * A curated list rather than an index feed, deliberately: a screener's scores are only comparable
+ * within a run over a stable universe, and an index source changes composition without telling you.
+ * It is also kept longer than the default setting so that raising `SCREENER_UNIVERSE_SIZE` actually
+ * raises the scan — the list was 50, which silently capped the setting at 50 whenever it was set
+ * higher.
+ *
+ * The first fifty lean heavily tech and growth; the block below adds cross-sector large caps so a
+ * full scan reads as the market rather than as one corner of it.
+ */
 export const POPULAR_STOCK_SYMBOLS = [
     // Tech Giants (the big technology companies)
     'AAPL',
@@ -541,6 +553,85 @@ export const POPULAR_STOCK_SYMBOLS = [
     'DIDI',
     'GRAB',
     'SE',
+
+    // Financials
+    'JPM',
+    'BAC',
+    'WFC',
+    'GS',
+    'MS',
+    'C',
+    'V',
+    'MA',
+    'AXP',
+    'BLK',
+    'SCHW',
+    'SPGI',
+    'CB',
+    'PGR',
+    'USB',
+
+    // Healthcare
+    'JNJ',
+    'UNH',
+    'LLY',
+    'PFE',
+    'MRK',
+    'ABBV',
+    'TMO',
+    'ABT',
+    'DHR',
+    'BMY',
+    'AMGN',
+    'GILD',
+    'ISRG',
+
+    // Consumer Staples & Retail
+    'WMT',
+    'COST',
+    'HD',
+    'MCD',
+    'NKE',
+    'SBUX',
+    'TGT',
+    'LOW',
+    'KO',
+    'PEP',
+    'PG',
+    'PM',
+    'MO',
+
+    // Industrials
+    'BA',
+    'CAT',
+    'GE',
+    'HON',
+    'UPS',
+    'RTX',
+    'LMT',
+    'DE',
+    'MMM',
+    'UNP',
+
+    // Energy
+    'XOM',
+    'CVX',
+    'COP',
+    'SLB',
+
+    // Media & Telecom
+    'DIS',
+    'CMCSA',
+    'T',
+    'VZ',
+    'TMUS',
+
+    // Semiconductors, Materials & Utilities
+    'AVGO',
+    'QCOM',
+    'TXN',
+    'LIN',
+    'NEE',
 ];
 
 export const NO_MARKET_NEWS =

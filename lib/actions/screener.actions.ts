@@ -1,6 +1,7 @@
 'use server';
 
 import { POPULAR_STOCK_SYMBOLS } from '@/lib/constants';
+import { mapWithConcurrency } from '@/lib/concurrency';
 import { loadConfig, getConfigNumber } from '@/lib/config';
 import { computeIndicators, type Candle } from '@/lib/indicators';
 import {
@@ -177,26 +178,6 @@ export async function getStockPriceHistory(symbol: string, range = '1y'): Promis
     }
 }
 
-/** Run async work over items with a bounded number of concurrent tasks. */
-async function mapWithConcurrency<T, R>(
-    items: T[],
-    limit: number,
-    worker: (item: T) => Promise<R>
-): Promise<R[]> {
-    const results: R[] = new Array(items.length);
-    let cursor = 0;
-
-    const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
-        while (cursor < items.length) {
-            const index = cursor++;
-            results[index] = await worker(items[index]);
-        }
-    });
-
-    await Promise.all(runners);
-    return results;
-}
-
 async function getStockName(symbol: string): Promise<string> {
     // The screener only needs a display label; the ticker is a fine fallback if the
     // profile lookup fails.
@@ -215,13 +196,13 @@ async function runScreenerUncached(
 ): Promise<ScreenerResult> {
     const strategies = STRATEGIES.map(({ id, name, summary }) => ({ id, name, summary }));
 
-    // One setting per market. A crypto scan is a history request per coin, while the stock list is
-    // a fixed curated set, so the two have no reason to share a number — and the defaults differ
-    // by an order of magnitude.
+    // One setting per market. Both default to 100, for different reasons: a crypto scan is a history
+    // request per coin and is bounded by the vendor's quota, while the stock list is a curated set
+    // and is bounded by how long a cold scan should reasonably take.
     const universeSize =
         assetType === 'crypto'
             ? await getConfigNumber('CRYPTO_SCREENER_UNIVERSE_SIZE', 100)
-            : await getConfigNumber('SCREENER_UNIVERSE_SIZE', 12);
+            : await getConfigNumber('SCREENER_UNIVERSE_SIZE', 100);
 
     // Build the universe: crypto by market cap, stocks from the curated popular list.
     const universe: { symbol: string; name: string; price: number; changePercent24h: number | null }[] = [];
@@ -275,8 +256,9 @@ async function runScreenerUncached(
 
             const result = runStrategy(bundle, strategyId, benchmark);
 
-            const name =
-                assetType === 'crypto' ? entry.name : await getStockName(entry.symbol);
+            // Stocks carry their ticker here; company names are resolved after the ranking, for the
+            // rows that are actually shown. See the note there for why.
+            const name = assetType === 'crypto' ? entry.name : entry.symbol;
 
             const candidate: ScreenerCandidate = {
                 symbol: entry.symbol,
@@ -304,6 +286,23 @@ async function runScreenerUncached(
     // Rank by score, then by how many of the strategy's own conditions matched, so ties
     // prefer assets that satisfied the strategy rather than just the raw percentage.
     candidates.sort((a, b) => b.score - a.score || b.matched - a.matched);
+
+    // Company names are resolved here, after the ranking, rather than inside the scan.
+    //
+    // A profile request per *scanned* symbol is one Finnhub call per symbol against a 60/minute free
+    // tier, so going from a 12-symbol scan to a 100-symbol one multiplies that cost by eight — for
+    // labels most rows never show, since the panel renders the matched ones. Only those are looked
+    // up, and a failure leaves the ticker, which is what the UI falls back to anyway. This is what
+    // makes a 100-symbol scan affordable.
+    if (assetType === 'stock') {
+        await mapWithConcurrency(
+            candidates.filter((candidate) => candidate.matched > 0),
+            CONCURRENCY,
+            async (candidate) => {
+                candidate.name = await getStockName(candidate.symbol);
+            }
+        );
+    }
 
     return {
         strategyId,

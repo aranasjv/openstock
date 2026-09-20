@@ -94,7 +94,6 @@ describe('getConfigNumber', () => {
         ['a non-numeric string', 'twelve'],
         ['zero', '0'],
         ['a negative number', '-5'],
-        ['an empty string', ''],
     ])('falls back for %s rather than producing a broken scan size', async (_label, stored) => {
         findOne.mockResolvedValue({ key: 'appsettings', values: { SCREENER_UNIVERSE_SIZE: stored } });
 
@@ -103,5 +102,17 @@ describe('getConfigNumber', () => {
         // Each of these would otherwise become a screener asking for 0 or NaN symbols, which
         // renders as an empty panel with no explanation.
         expect(await getConfigNumber('SCREENER_UNIVERSE_SIZE', 12)).toBe(12);
+    });
+
+    it('treats an empty stored value as unset, so the schema default beats the caller fallback', async () => {
+        findOne.mockResolvedValue({ key: 'appsettings', values: { SCREENER_UNIVERSE_SIZE: '' } });
+
+        const { getConfigNumber } = await freshConfig();
+
+        // Clearing a field saves '', and the intent there is "unset" — so the value is ignored and the
+        // schema default applies. The caller's fallback is only reached when there is no default
+        // either, which is why this is 100 and not the 12 passed in. The two are both usable scan
+        // sizes; the failure this guards against is 0 or NaN, which renders as an empty panel.
+        expect(await getConfigNumber('SCREENER_UNIVERSE_SIZE', 12)).toBe(100);
     });
 });

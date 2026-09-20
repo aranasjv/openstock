@@ -335,8 +335,9 @@ export const CONFIG_SCHEMA: SettingDef[] = [
         group: 'screener',
         env: ['SCREENER_UNIVERSE_SIZE'],
         label: 'Stocks scanned',
-        description: 'How many stocks the screener evaluates. Each one costs a history request.',
-        default: '12',
+        description:
+            'How many stocks the screener evaluates, taken from the curated list in order of liquidity. Each one costs one history request, and a cold scan of 100 takes roughly half a minute before it is cached. Company names are only looked up for the rows that match, so raising this does not multiply the profile calls.',
+        default: '100',
         type: 'number',
     },
     {
