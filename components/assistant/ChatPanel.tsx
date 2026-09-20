@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState, useTransition } from 'react';
 import { Send, Loader2, Wrench, AlertTriangle, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { sendMessage, type ConversationDetail } from '@/lib/actions/assistant.actions';
+import MarkdownMessage from '@/components/assistant/MarkdownMessage';
 
 interface ChatPanelProps {
     conversation: ConversationDetail | null;
@@ -111,13 +112,21 @@ export default function ChatPanel({ conversation, providerLabel }: ChatPanelProp
                 {messages.map((message, index) => (
                     <div key={index} className={message.role === 'user' ? 'flex justify-end' : ''}>
                         <div
-                            className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
+                            className={`rounded-lg px-3 py-2 text-sm ${
                                 message.role === 'user'
-                                    ? 'bg-teal-600/20 text-gray-100'
-                                    : 'bg-gray-800/60 text-gray-200'
+                                    ? 'max-w-[85%] bg-teal-600/20 text-gray-100'
+                                    : // Assistant replies carry markdown, including tables —
+                                      // they need the width, the user's question does not.
+                                      'max-w-[95%] bg-gray-800/60 text-gray-200'
                             }`}
                         >
-                            <p className="whitespace-pre-line leading-relaxed">{message.content}</p>
+                            {message.role === 'assistant' ? (
+                                <MarkdownMessage content={message.content} />
+                            ) : (
+                                // The user's own text is shown as typed; markdown here would
+                                // quietly reformat what they wrote.
+                                <p className="whitespace-pre-line leading-relaxed">{message.content}</p>
+                            )}
 
                             {/* Which data produced this answer. Shown so a claim can be checked
                                 against its source rather than taken on trust. */}

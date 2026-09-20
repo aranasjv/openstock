@@ -4,7 +4,35 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import SearchCommand from '@/components/SearchCommand';
 import CryptoSearchCommand from '@/components/crypto/CryptoSearchCommand';
-import { SEARCH_PALETTE_ITEMS } from '@/lib/constants';
+import { NAV_ITEMS, SEARCH_PALETTE_ITEMS } from '@/lib/constants';
+
+/**
+ * Order is a sidebar concern (each search palette sits next to the market it searches), but
+ * the hrefs and labels come from `NAV_ITEMS`. This list used to be a second, hand-maintained
+ * copy of the nav, which had already drifted: `/assistant` existed in NAV_ITEMS and was
+ * missing here, so the assistant was unreachable from the sidebar entirely.
+ */
+const SIDEBAR_ORDER = [
+    '/',
+    '/assistant',
+    '/search',
+    '/crypto',
+    '/crypto-search',
+    '/watchlist',
+    '/holdings',
+    '/settings',
+    '/api-docs',
+];
+
+/**
+ * Sidebar-only label overrides, keyed by href. A sidebar has room for "Stock search" where a
+ * header needs "Search"; an entry with no override keeps its `NAV_ITEMS` label.
+ */
+const LABEL_OVERRIDES: Record<string, string> = {
+    '/search': 'Stock search',
+    '/crypto-search': 'Crypto search',
+    '/assistant': 'AI Chat',
+};
 
 interface SidebarNavProps {
     initialStocks: StockWithWatchlistStatus[];
@@ -23,16 +51,11 @@ export default function SidebarNav({ initialStocks, initialCoins }: SidebarNavPr
 
     const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href));
 
-    const entries = [
-        { href: '/', label: 'Dashboard' },
-        { href: '/search', label: 'Stock search', palette: 'stock' as const },
-        { href: '/crypto', label: 'Crypto' },
-        { href: '/crypto-search', label: 'Crypto search', palette: 'crypto' as const },
-        { href: '/watchlist', label: 'Watchlist' },
-        { href: '/holdings', label: 'Holdings' },
-        { href: '/settings', label: 'Settings' },
-        { href: '/api-docs', label: 'API Docs' },
-    ];
+    const entries = SIDEBAR_ORDER.map((href) => ({
+        href,
+        label: LABEL_OVERRIDES[href] ?? NAV_ITEMS.find((item) => item.href === href)?.label ?? href,
+        palette: SEARCH_PALETTE_ITEMS[href],
+    }));
 
     return (
         <nav className="flex flex-col gap-0.5">
