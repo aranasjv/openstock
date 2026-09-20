@@ -836,6 +836,44 @@ export const AI_TOOLS: AITool[] = [
             };
         },
     },
+    {
+        spec: {
+            name: 'get_exposure_posture',
+            description:
+                'How much capital should be in equities right now: a ceiling percentage, a NEW_ENTRY_ALLOWED / REDUCE_ONLY / CASH_PRIORITY recommendation, and a confidence level. It synthesises eight market dimensions and this app can currently supply one, so expect REDUCE_ONLY at LOW confidence with structural=true — say plainly that the call reflects missing inputs rather than market weakness, and do not soften it into "be cautious".',
+            parameters: { type: 'object', properties: {} },
+        },
+        execute: async () => {
+            const [{ marketBreadthReport }, { evaluateExposure }] = await Promise.all([
+                import('@/lib/breadth-data'),
+                import('@/lib/exposure'),
+            ]);
+
+            const breadth = await marketBreadthReport();
+
+            // A reference-only breadth score is a convention, not a reading, so it is withheld rather
+            // than fed in as if it had been measured.
+            const posture = evaluateExposure({
+                breadth: breadth && !breadth.composite.referenceOnly ? breadth.composite.score : null,
+            });
+
+            return {
+                recommendation: posture.recommendation,
+                ceilingPct: posture.ceilingPct,
+                composite: posture.composite,
+                confidence: posture.confidence,
+                participation: posture.participation,
+                structural: posture.structural,
+                dimensionsProvided: posture.provided,
+                dimensionsMissing: posture.missing,
+                criticalMissing: posture.criticalMissing,
+                rationale: posture.rationale,
+                note: posture.structural
+                    ? 'The recommendation is structural: the framework cannot permit new entries without the critical inputs, so this is not a reading of the market. Report it as a limitation of the available data rather than as advice about current conditions.'
+                    : 'Deterministic synthesis from the exposure-coach playbook. Report the ceiling and the missing dimensions together.',
+            };
+        },
+    },
 ];
 
 const TOOL_BY_NAME = new Map(AI_TOOLS.map((tool) => [tool.spec.name, tool]));
