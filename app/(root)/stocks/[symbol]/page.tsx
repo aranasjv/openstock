@@ -27,7 +27,7 @@ export default async function StockDetails({ params }: StockDetailsPageProps) {
     });
     const userId = session?.user?.id;
     const [isInWatchlist, sentimentInsights] = await Promise.all([
-        userId ? isStockInWatchlist(userId, symbol) : Promise.resolve(false),
+        userId ? isStockInWatchlist(symbol) : Promise.resolve(false),
         getStockSentimentInsights(symbol),
     ]);
 
@@ -66,7 +66,6 @@ export default async function StockDetails({ params }: StockDetailsPageProps) {
                             symbol={symbol.toUpperCase()}
                             company={symbol.toUpperCase()}
                             isInWatchlist={isInWatchlist}
-                            userId={userId}
                         />
                     </div>
 

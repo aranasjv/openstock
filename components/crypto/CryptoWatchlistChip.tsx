@@ -9,7 +9,6 @@ import CreateAlertModal from "@/components/watchlist/CreateAlertModal";
 interface CryptoWatchlistChipProps {
     /** CoinGecko coin id, stored uppercase by the watchlist model. */
     coinId: string;
-    userId: string;
     /** Market data for this coin, fetched in one batch by the manager. */
     coin: CryptoMarketCoin | null;
 }
@@ -18,11 +17,11 @@ interface CryptoWatchlistChipProps {
  * Presentational: the manager fetches all watchlist market data in a single batched
  * CoinGecko call, so this does no fetching of its own.
  */
-export default function CryptoWatchlistChip({ coinId, userId, coin }: CryptoWatchlistChipProps) {
+export default function CryptoWatchlistChip({ coinId, coin }: CryptoWatchlistChipProps) {
     const [modalOpen, setModalOpen] = useState(false);
 
     const handleRemove = async () => {
-        await removeFromWatchlist(userId, coinId, 'crypto');
+        await removeFromWatchlist(coinId, 'crypto');
     };
 
     const label = coin ? `${coin.name} (${coin.symbol})` : coinId;
@@ -56,7 +55,6 @@ export default function CryptoWatchlistChip({ coinId, userId, coin }: CryptoWatc
             </form>
 
             <CreateAlertModal
-                userId={userId}
                 symbol={coinId}
                 currentPrice={price}
                 companyName={coin?.name}

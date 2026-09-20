@@ -24,8 +24,10 @@ Reviewed with:
 
 ## 0. Stop-ship: broken access control
 
-Pre-existing, and the most serious findings in the codebase. Nothing in the vendored skills
-addresses them — they are application-security gaps, not methodology gaps.
+**Resolved.** These were pre-existing and the most serious findings in the codebase. They are
+kept here as the record of what was wrong; the fix is described at the end of this section.
+Nothing in the vendored skills addressed them — they were application-security gaps, not
+methodology gaps.
 
 **S1 — Any user can delete or toggle any other user's alert (blocker).**
 `lib/actions/alert.actions.ts:46` (`deleteAlert`) and `:59` (`toggleAlert`) call
@@ -49,10 +51,29 @@ module with no authorization. It is only used by the Inngest job.
 `middleware.ts:6` does not validate the session, so an action that does not verify it itself
 is reachable with a forged cookie. Defence in depth requires S1/S2's fix.
 
-> Not fixed here: it changes action signatures and every caller. Mechanical, and I will do it
-> on request — `requireUserId()` per action, drop the `userId` params, move
-> `getAllUsersForNewsEmail` out of `'use server'`, delete the `fetchJSON` export, and add the
-> authorization tests from A11.
+**Fix applied — a two-layer split, not a check that can be forgotten.**
+
+- `lib/data/*.ts` (`server-only`, deliberately **not** `'use server'`) holds the queries and
+  takes an explicit `userId`. It resolves nothing, and cannot be reached from the browser
+  because `server-only` makes importing it into a client bundle a build error.
+- `lib/actions/*.actions.ts` resolves the session via `requireUserId()` (`lib/session.ts`) and
+  passes *that* id down. It no longer accepts an identity from the caller at all.
+- Mutations filter by `userId` as well as `_id` (`lib/data/alerts.ts`), which is the actual
+  authorisation check — and a malformed id now reads as "not found" instead of throwing a
+  `CastError` (A7).
+- The `userId` props were removed from the client components **end to end**, so identity is
+  not merely ignored on the server — it is never passed. That is what stops the hole being
+  reintroduced by someone "just using the prop".
+- S3 and the `getWatchlistSymbolsByEmail(email)` half of S2 were **deleted, not relocated**:
+  both were dead code (imported by `lib/inngest/functions.ts` but never called), so the
+  callable "list every user's email" endpoint simply went away.
+- S5 is addressed by S1/S2 rather than by the middleware: it runs on the **edge** runtime,
+  where validating a session would need a database the edge cannot reach. The presence check
+  stays as a cheap first filter; the action is the real gate.
+
+Covered by `__tests__/action-authorization.test.ts` ("the owner comes from the session; the
+caller cannot influence it") and `__tests__/data-owner-scoping.test.ts` ("the query filter is
+the authorisation"). That is A11's recommendation applied.
 
 ---
 

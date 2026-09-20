@@ -27,7 +27,7 @@ export default async function Sidebar({ user }: { user: User }) {
     const [initialStocks, initialCoins, portfolio, stockResult, cryptoResult] = await Promise.all([
         searchStocks(),
         searchCrypto(),
-        getPortfolioSummary(user.id),
+        getPortfolioSummary(),
         runScreener('stock', strategyId),
         runScreener('crypto', strategyId),
     ]);

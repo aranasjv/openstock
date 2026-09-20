@@ -5,21 +5,18 @@ import { Button } from "@/components/ui/button";
 import CreateAlertModal from "@/components/watchlist/CreateAlertModal";
 
 interface CryptoAlertButtonProps {
-    userId: string;
     coinId: string;
     coinName: string;
     currentPrice: number;
 }
 
 export default function CryptoAlertButton({
-    userId,
     coinId,
     coinName,
     currentPrice,
 }: CryptoAlertButtonProps) {
     return (
         <CreateAlertModal
-            userId={userId}
             symbol={coinId}
             currentPrice={currentPrice}
             companyName={coinName}

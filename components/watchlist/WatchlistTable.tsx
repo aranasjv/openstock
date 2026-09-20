@@ -11,11 +11,10 @@ import { removeFromWatchlist } from "@/lib/actions/watchlist.actions";
 
 interface WatchlistTableProps {
     data: any[];
-    userId: string;
     onRefresh?: () => void;
 }
 
-export default function WatchlistTable({ data, userId, onRefresh }: WatchlistTableProps) {
+export default function WatchlistTable({ data, onRefresh }: WatchlistTableProps) {
     const [stocks, setStocks] = useState(data);
 
     useEffect(() => {
@@ -129,7 +128,6 @@ export default function WatchlistTable({ data, userId, onRefresh }: WatchlistTab
                                 <td className="px-6 py-4 text-right">
                                     <div className="flex items-center justify-end space-x-3 opacity-80 group-hover:opacity-100 transition-opacity">
                                         <CreateAlertModal
-                                            userId={userId}
                                             symbol={stock.symbol}
                                             currentPrice={stock.price}
                                             onAlertCreated={onRefresh}
@@ -148,7 +146,7 @@ export default function WatchlistTable({ data, userId, onRefresh }: WatchlistTab
                                                 showTrashIcon={false}
                                                 onWatchlistChange={async (sym, added) => {
                                                     if (!added) {
-                                                        await removeFromWatchlist(userId, sym);
+                                                        await removeFromWatchlist(sym);
                                                         // Update local list faster than full page refresh if you want
                                                         setStocks((curr: any[]) => curr.filter((s: any) => s.symbol !== sym));
                                                         if (onRefresh) onRefresh();

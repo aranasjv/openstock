@@ -3,7 +3,7 @@ import 'server-only';
 import { loadConfig } from '@/lib/config';
 import { getAdminUserId } from '@/lib/admin';
 import { runScreener } from '@/lib/actions/screener.actions';
-import { getPortfolioSummary } from '@/lib/actions/holdings.actions';
+import { getPortfolioSummaryForUser } from '@/lib/data/portfolio';
 import { getTelegramConfig, sendTelegramMessage } from '@/lib/telegram';
 import { buildDigestMessages, type DigestPick } from '@/lib/notifications';
 import { getStrategy, isStrategyId, DEFAULT_STRATEGY_ID } from '@/lib/strategies';
@@ -63,7 +63,7 @@ export async function runDailyDigest(): Promise<DigestResult> {
         const adminId = await getAdminUserId();
 
         const summary = adminId
-            ? await getPortfolioSummary(adminId)
+            ? await getPortfolioSummaryForUser(adminId)
             : { holdings: [], totalValue: 0, totalPnlPercent: 0, unpricedSymbols: [] as string[], totalCost: 0, totalPnl: 0 };
 
         const messages = buildDigestMessages({

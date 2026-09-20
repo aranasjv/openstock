@@ -8,10 +8,9 @@ import CreateAlertModal from "./CreateAlertModal";
 
 interface WatchlistStockChipProps {
     symbol: string;
-    userId: string;
 }
 
-export default function WatchlistStockChip({ symbol, userId }: WatchlistStockChipProps) {
+export default function WatchlistStockChip({ symbol }: WatchlistStockChipProps) {
     const [price, setPrice] = useState<number>(0);
     const [modalOpen, setModalOpen] = useState(false);
     const [loadingPrice, setLoadingPrice] = useState(false);
@@ -38,7 +37,7 @@ export default function WatchlistStockChip({ symbol, userId }: WatchlistStockChi
     };
 
     const handleRemove = async () => {
-        await removeFromWatchlist(userId, symbol);
+        await removeFromWatchlist(symbol);
     };
 
     return (
@@ -66,7 +65,6 @@ export default function WatchlistStockChip({ symbol, userId }: WatchlistStockChi
             </form>
 
             <CreateAlertModal
-                userId={userId}
                 symbol={symbol}
                 currentPrice={price}
                 open={modalOpen}

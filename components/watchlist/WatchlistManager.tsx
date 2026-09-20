@@ -9,10 +9,9 @@ import { WatchlistItem } from '@/database/models/watchlist.model';
 
 interface WatchlistManagerProps {
     initialItems: WatchlistItem[]; // Using the DB model type directly or a simplified version
-    userId: string;
 }
 
-export default function WatchlistManager({ initialItems, userId }: WatchlistManagerProps) {
+export default function WatchlistManager({ initialItems }: WatchlistManagerProps) {
     // Sort state: 'asc' (A-Z), 'desc' (Z-A), or null (added order/default)
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null);
 
@@ -75,11 +74,7 @@ export default function WatchlistManager({ initialItems, userId }: WatchlistMana
                 {watchlistSymbols.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
                         {sortedItems.map((item) => (
-                            <WatchlistStockChip
-                                key={item.symbol}
-                                symbol={item.symbol}
-                                userId={userId}
-                            />
+                            <WatchlistStockChip key={item.symbol} symbol={item.symbol} />
                         ))}
                     </div>
                 ) : (

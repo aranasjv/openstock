@@ -40,7 +40,7 @@ export default async function CryptoDetails({ params }: CryptoDetailsPageProps) 
     const userId = session?.user?.id;
 
     const [isInWatchlist, coin, marketSentiment] = await Promise.all([
-        userId ? isStockInWatchlist(userId, coinId, 'crypto') : Promise.resolve(false),
+        userId ? isStockInWatchlist(coinId, 'crypto') : Promise.resolve(false),
         getCryptoCoinDetail(coinId),
         getCryptoMarketSentiment(),
     ]);
@@ -112,12 +112,10 @@ export default async function CryptoDetails({ params }: CryptoDetailsPageProps) 
                             symbol={coinId}
                             company={coin?.name ?? coinId}
                             isInWatchlist={isInWatchlist}
-                            userId={userId}
                             assetType="crypto"
                         />
                         {userId ? (
                             <CryptoAlertButton
-                                userId={userId}
                                 coinId={coinId}
                                 coinName={coin?.name ?? coinId}
                                 currentPrice={coin?.currentPrice ?? 0}

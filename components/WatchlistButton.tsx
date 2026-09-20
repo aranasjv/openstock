@@ -9,7 +9,6 @@ interface WatchlistButtonProps {
     isInWatchlist: boolean;
     showTrashIcon?: boolean;
     type?: "button" | "icon";
-    userId?: string; // Made optional for backward compat, but required for actions
     assetType?: AssetType; // Defaults to 'stock'
     onWatchlistChange?: (symbol: string, added: boolean) => void;
 }
@@ -20,7 +19,6 @@ const WatchlistButton = ({
     isInWatchlist,
     showTrashIcon = false,
     type = "button",
-    userId,
     assetType = "stock",
     onWatchlistChange,
 }: WatchlistButtonProps) => {
@@ -35,25 +33,19 @@ const WatchlistButton = ({
     const handleClick = async (e: React.MouseEvent) => {
         e.preventDefault(); // Prevent link navigation if inside a link
 
-        if (!userId && !onWatchlistChange) {
-            console.error("WatchlistButton: userId or onWatchlistChange is required");
-            toast.error("Please sign in to modify watchlist");
-            return;
-        }
-
         const next = !added;
         setAdded(next); // Optimistic update
         setLoading(true);
 
         try {
-            if (userId) {
-                if (next) {
-                    await addToWatchlist(userId, symbol, company, assetType);
-                    toast.success(`${symbol} added to watchlist`);
-                } else {
-                    await removeFromWatchlist(userId, symbol, assetType);
-                    toast.success(`${symbol} removed from watchlist`);
-                }
+            // The action resolves the session itself; a signed-out caller throws and the
+            // optimistic update is reverted below.
+            if (next) {
+                await addToWatchlist(symbol, company, assetType);
+                toast.success(`${symbol} added to watchlist`);
+            } else {
+                await removeFromWatchlist(symbol, assetType);
+                toast.success(`${symbol} removed from watchlist`);
             }
 
             // Call external handler if provided (e.g. for UI refresh)

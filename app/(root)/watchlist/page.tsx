@@ -32,12 +32,11 @@ export default async function WatchlistPage({ searchParams }: WatchlistPageProps
         redirect('/sign-in');
     }
 
-    const userId = session.user.id;
-
     // Both lists are fetched so the tab counts are accurate regardless of the active tab.
+    // Each call resolves the session itself — no id is passed in.
     const [stockItems, cryptoItems] = await Promise.all([
-        getUserWatchlist(userId, 'stock'),
-        getUserWatchlist(userId, 'crypto'),
+        getUserWatchlist('stock'),
+        getUserWatchlist('crypto'),
     ]);
 
     const activeItems = assetType === 'crypto' ? cryptoItems : stockItems;
@@ -47,7 +46,7 @@ export default async function WatchlistPage({ searchParams }: WatchlistPageProps
     // stock page also listed crypto coins and then asked Finnhub to quote CoinGecko ids —
     // the reported "watchlist doesn't support crypto" bug.
     const [alerts, symbolNews, topCoins] = await Promise.all([
-        getUserAlerts(userId, assetType),
+        getUserAlerts(assetType),
         assetType === 'crypto' ? getCryptoNews() : getNews(stockSymbols),
         assetType === 'crypto' ? searchCrypto() : Promise.resolve([]),
     ]);
@@ -92,9 +91,9 @@ export default async function WatchlistPage({ searchParams }: WatchlistPageProps
                 <div className="lg:col-span-3 space-y-8">
                     <div className="space-y-6">
                         {assetType === 'crypto' ? (
-                            <CryptoWatchlistManager initialItems={activeItems} userId={userId} />
+                            <CryptoWatchlistManager initialItems={activeItems} />
                         ) : (
-                            <WatchlistManager initialItems={activeItems} userId={userId} />
+                            <WatchlistManager initialItems={activeItems} />
                         )}
                     </div>
 

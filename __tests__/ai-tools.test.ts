@@ -23,11 +23,13 @@ const getCryptoNews = vi.fn();
 const getNews = vi.fn();
 const runScreener = vi.fn();
 
-vi.mock('@/lib/actions/holdings.actions', () => ({
-    getPortfolioSummary: (userId: string) => getPortfolioSummary(userId),
+// The personal tools go through the data layer, not the server actions: an action resolves a
+// session, and a tool call already has an authenticated userId from its own caller.
+vi.mock('@/lib/data/portfolio', () => ({
+    getPortfolioSummaryForUser: (userId: string) => getPortfolioSummary(userId),
 }));
-vi.mock('@/lib/actions/watchlist.actions', () => ({
-    getUserWatchlist: (userId: string, assetType?: string) => getUserWatchlist(userId, assetType),
+vi.mock('@/lib/data/watchlist', () => ({
+    getWatchlistForUser: (userId: string, assetType?: string) => getUserWatchlist(userId, assetType),
 }));
 vi.mock('@/lib/actions/crypto.actions', () => ({
     getCryptoMarkets: (limit: number) => getCryptoMarkets(limit),

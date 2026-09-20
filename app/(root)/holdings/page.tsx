@@ -15,8 +15,7 @@ export default async function HoldingsPage() {
         redirect('/sign-in');
     }
 
-    const userId = session.user.id;
-    const summary = await getPortfolioSummary(userId);
+    const summary = await getPortfolioSummary();
 
     const pnlClass = summary.totalPnl >= 0 ? 'text-emerald-400' : 'text-red-400';
 
@@ -59,7 +58,7 @@ export default async function HoldingsPage() {
                 </p>
             ) : null}
 
-            <HoldingsManager userId={userId} holdings={summary.holdings} />
+            <HoldingsManager holdings={summary.holdings} />
         </div>
     );
 }

@@ -355,8 +355,11 @@ export const AI_TOOLS: AITool[] = [
             parameters: { type: 'object', properties: {} },
         },
         execute: async (_args, ctx) => {
-            const { getPortfolioSummary } = await import('@/lib/actions/holdings.actions');
-            const summary = await getPortfolioSummary(ctx.userId);
+            // The data layer, not the server action: the action resolves a session, and a tool
+            // call already knows whose turn it is (ctx.userId comes from the authenticated
+            // caller), so it must not go through a second, conflicting identity check.
+            const { getPortfolioSummaryForUser } = await import('@/lib/data/portfolio');
+            const summary = await getPortfolioSummaryForUser(ctx.userId);
 
             if (summary.holdings.length === 0) {
                 return { holdings: [], note: 'The user has not recorded any holdings yet.' };
@@ -397,8 +400,8 @@ export const AI_TOOLS: AITool[] = [
         },
         execute: async (args, ctx) => {
             const assetType = args.assetType === 'crypto' ? 'crypto' : args.assetType === 'stock' ? 'stock' : undefined;
-            const { getUserWatchlist } = await import('@/lib/actions/watchlist.actions');
-            const items = await getUserWatchlist(ctx.userId, assetType);
+            const { getWatchlistForUser } = await import('@/lib/data/watchlist');
+            const items = await getWatchlistForUser(ctx.userId, assetType);
 
             return {
                 count: items.length,

@@ -10,7 +10,6 @@ import { createAlert } from "@/lib/actions/alert.actions";
 import { toast } from "sonner"; // Assuming sonner is available or use existing toast
 
 interface CreateAlertModalProps {
-    userId: string;
     symbol: string;
     currentPrice: number;
     companyName?: string; // Optional prop for better display
@@ -23,7 +22,6 @@ interface CreateAlertModalProps {
 }
 
 export default function CreateAlertModal({
-    userId,
     symbol,
     currentPrice,
     companyName = "",
@@ -54,7 +52,6 @@ export default function CreateAlertModal({
         setLoading(true);
         try {
             await createAlert({
-                userId,
                 symbol,
                 targetPrice: parseFloat(targetPrice),
                 condition,

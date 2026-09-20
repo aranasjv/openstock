@@ -22,7 +22,6 @@ export interface HoldingRow {
 }
 
 interface HoldingsManagerProps {
-    userId: string;
     holdings: HoldingRow[];
 }
 
@@ -31,7 +30,7 @@ interface Suggestion {
     label: string;
 }
 
-export default function HoldingsManager({ userId, holdings }: HoldingsManagerProps) {
+export default function HoldingsManager({ holdings }: HoldingsManagerProps) {
     const [assetType, setAssetType] = useState<'stock' | 'crypto'>('stock');
     const [symbol, setSymbol] = useState('');
     const [quantity, setQuantity] = useState('');
@@ -76,7 +75,6 @@ export default function HoldingsManager({ userId, holdings }: HoldingsManagerPro
         startTransition(async () => {
             try {
                 await addHolding({
-                    userId,
                     symbol: symbol.trim(),
                     assetType,
                     quantity: Number.parseFloat(quantity),
@@ -95,7 +93,7 @@ export default function HoldingsManager({ userId, holdings }: HoldingsManagerPro
     const handleRemove = (row: HoldingRow) => {
         startTransition(async () => {
             try {
-                await removeHolding(userId, row.symbol, row.assetType);
+                await removeHolding(row.symbol, row.assetType);
                 toast.success(`${row.symbol} removed.`);
             } catch {
                 toast.error('Could not remove holding.');

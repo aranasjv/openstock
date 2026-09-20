@@ -59,8 +59,6 @@ async function fetchJSON<T>(url: string, revalidateSeconds?: number): Promise<T>
     return (await res.json()) as T;
 }
 
-export { fetchJSON };
-
 function getExchangeLabel(symbol: string, exchange?: string) {
     if (exchange?.trim()) {
         return exchange.trim();

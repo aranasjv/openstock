@@ -1,9 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { headers } from 'next/headers';
-import { getAuth } from '@/lib/better-auth/auth';
 import { connectToDatabase } from '@/database/mongoose';
+import { requireUserId } from '@/lib/session';
 import {
     ConversationModel,
     MAX_CONVERSATION_MESSAGES,
@@ -23,14 +22,6 @@ import { checkRateLimit } from '@/lib/rate-limit';
 /** A turn costs up to six provider calls, so cap how often one user can start one. */
 const TURNS_PER_WINDOW = 10;
 const WINDOW_MS = 5 * 60 * 1000;
-
-async function requireUserId(): Promise<string> {
-    const auth = await getAuth();
-    const session = await auth.api.getSession({ headers: await headers() });
-    const userId = session?.user?.id;
-    if (!userId) throw new Error('Not signed in.');
-    return userId;
-}
 
 export interface ConversationSummary {
     id: string;

@@ -10,10 +10,9 @@ import { resolveCryptoSymbols } from '@/lib/actions/tradingview.actions';
 
 interface CryptoWatchlistManagerProps {
     initialItems: Array<{ symbol: string; company: string; addedAt?: string }>;
-    userId: string;
 }
 
-export default function CryptoWatchlistManager({ initialItems, userId }: CryptoWatchlistManagerProps) {
+export default function CryptoWatchlistManager({ initialItems }: CryptoWatchlistManagerProps) {
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null);
     const [coins, setCoins] = useState<Record<string, CryptoMarketCoin>>({});
     const [symbols, setSymbols] = useState<Record<string, string | null>>({});
@@ -126,7 +125,6 @@ export default function CryptoWatchlistManager({ initialItems, userId }: CryptoW
                             <CryptoWatchlistChip
                                 key={item.symbol}
                                 coinId={item.symbol}
-                                userId={userId}
                                 coin={coins[item.symbol.toUpperCase()] ?? null}
                             />
                         ))}

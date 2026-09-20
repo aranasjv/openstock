@@ -212,9 +212,19 @@ Normalize **only** in `lib/ai-provider.ts`; nothing above it should know which p
 - Server actions live in `lib/actions/*.actions.ts` marked `'use server'`. In such a file
   **every export must be an async function** — a sync helper (even a test helper) breaks the
   build. Put non-action helpers in their own module (see `lib/screener-cache.ts`).
-- Server-only modules import `server-only`. Pages/actions resolve the session themselves and
-  scope queries by `userId` — the check lives in the action, because actions are callable
-  directly, not only through the page.
+- **Personal data goes through two layers, and this is a security boundary, not style:**
+  - `lib/data/*.ts` — `server-only`, **not** `'use server'`. Every function takes an explicit
+    `userId` and resolves nothing. Safe only because it is unreachable from the browser.
+  - `lib/actions/*.actions.ts` — `'use server'`. Resolves the session via
+    `requireUserId()` (`lib/session.ts`) and passes *that* id down. It must never accept an
+    identity from the caller.
+  Why both: actions are callable directly (not only through the page), and the middleware
+  only checks that a cookie is **present**, not valid — so the action is the only place that
+  can tell who is really asking. The data layer keeps the explicit `userId` because the
+  scheduled jobs (admin user) and the assistant tools (the signed-in user) legitimately act
+  for someone else. A query that mutates must also filter by `userId`, not just `_id`.
+  Covered by `__tests__/action-authorization.test.ts` and `__tests__/data-owner-scoping.test.ts`.
+- `.actions.ts` transport only: `revalidatePath` belongs there, not in `lib/data/`.
 - `/api/*` is excluded from the auth middleware matcher, so API routes must do their own
   auth and must not leak config. `/api/health` reports failures as a status, never as a raw
   driver error (those embed the connection string).
