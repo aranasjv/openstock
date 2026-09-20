@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { X, Loader2, Sparkles } from 'lucide-react';
 import ChatPanel from '@/components/assistant/ChatPanel';
@@ -46,31 +46,34 @@ export default function AssistantOverlay() {
         return () => window.removeEventListener(ASSISTANT_OVERLAY_EVENT, handler);
     }, []);
 
-    useEffect(() => {
-        if (!open || conversation || loading) return;
+    // Loaded on first open rather than at mount: most page views never open the assistant, and
+    // doing it eagerly would add a database round trip to every navigation.
+    //
+    // Nothing in here may depend on state this effect sets. An earlier version listed `loading`
+    // in the dependency array, so `setLoading(true)` re-ran the effect, whose cleanup marked the
+    // request in flight as cancelled — and the re-run then returned early because loading was
+    // already true. With nothing left to clear the flag, the panel sat on its spinner forever.
+    // A ref marks the one-shot instead, and there is no cancellation guard because this
+    // component is mounted for the lifetime of the layout and never unmounts.
+    const startedRef = useRef(false);
 
-        let cancelled = false;
+    useEffect(() => {
+        if (!open || startedRef.current) return;
+        startedRef.current = true;
+
         setLoading(true);
         setError(null);
 
         loadAssistantOverlayState()
             .then((state) => {
-                if (cancelled) return;
                 setConversation(state.conversation);
                 setProviderLabel(state.providerLabel);
             })
             .catch((cause: unknown) => {
-                if (cancelled) return;
                 setError(cause instanceof Error ? cause.message : 'Could not open the assistant.');
             })
-            .finally(() => {
-                if (!cancelled) setLoading(false);
-            });
-
-        return () => {
-            cancelled = true;
-        };
-    }, [open, conversation, loading]);
+            .finally(() => setLoading(false));
+    }, [open]);
 
     useEffect(() => {
         if (!open) return;
