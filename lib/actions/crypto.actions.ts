@@ -432,8 +432,15 @@ export const searchCrypto = cache(async (query?: string): Promise<CryptoCoinWith
     }));
 });
 
+/** CoinGecko's demo tier serves at most a year of daily history. */
+function clampHistoryDays(days: number): number {
+    const whole = Math.trunc(days);
+    if (!Number.isFinite(whole) || whole < 1) return 200;
+    return Math.min(whole, 365);
+}
+
 /**
- * Daily close/volume history for one coin, used by the screener.
+ * Daily close/volume history for one coin, used by the screener and the regime model.
  *
  * CoinGecko's market_chart returns close prices and volumes but not OHLC, so
  * open/high/low are filled from the close. Every indicator the screener uses is derived
@@ -442,14 +449,21 @@ export const searchCrypto = cache(async (query?: string): Promise<CryptoCoinWith
  * Cached for 6 hours. The indicators are computed from DAILY bars, so an hourly refetch
  * bought nothing and was the direct cause of the rate limiting: a cold scan of twelve coins
  * meant twelve upstream calls. With this cache a repeat scan costs zero requests.
+ *
+ * `days` is a parameter because the regime model needs a year for its drawdown component while
+ * the screener's indicators need 200 — and the two windows cache separately, so asking for the
+ * longer one everywhere would double the CoinGecko load for coins the screener already holds.
  */
-export async function getCryptoPriceHistory(coinId: string): Promise<Candle[] | null> {
+export async function getCryptoPriceHistory(coinId: string, days = 200): Promise<Candle[] | null> {
     if (!coinId) return null;
 
     const raw = await fetchCoinGecko<{
         prices?: [number, number][];
         total_volumes?: [number, number][];
-    }>(`/coins/${encodeURIComponent(coinId.toLowerCase())}/market_chart?vs_currency=usd&days=200&interval=daily`, 21_600);
+    }>(
+        `/coins/${encodeURIComponent(coinId.toLowerCase())}/market_chart?vs_currency=usd&days=${clampHistoryDays(days)}&interval=daily`,
+        21_600
+    );
 
     if (!raw?.prices || !Array.isArray(raw.prices)) return null;
 
