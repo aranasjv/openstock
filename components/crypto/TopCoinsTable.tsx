@@ -36,7 +36,7 @@ export default function TopCoinsTable({ coins }: TopCoinsTableProps) {
                     <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
                         Top coins
                     </h2>
-                    <span className="text-[10px] text-gray-600">by market cap</span>
+                    <span className="text-[10px] text-gray-500">by market cap</span>
                 </div>
 
                 {/* Scrolls internally so the dashboard keeps its height. */}
@@ -68,7 +68,7 @@ export default function TopCoinsTable({ coins }: TopCoinsTableProps) {
                                         title="Click for details"
                                         className="cursor-pointer border-b border-gray-800/60 transition-colors last:border-0 hover:bg-white/5"
                                     >
-                                        <td className="px-2 py-1.5 text-[11px] text-gray-600">
+                                        <td className="px-2 py-1.5 text-[11px] text-gray-500">
                                             {coin.marketCapRank ?? '-'}
                                         </td>
                                         <td className="px-2 py-1.5">
@@ -101,7 +101,7 @@ export default function TopCoinsTable({ coins }: TopCoinsTableProps) {
                                                 ? 'N/A'
                                                 : `${change >= 0 ? '+' : ''}${change.toFixed(1)}%`}
                                         </td>
-                                        <td className="px-1 py-1.5 text-gray-700">
+                                        <td className="px-1 py-1.5 text-gray-500">
                                             <ChevronRight className="h-3 w-3" />
                                         </td>
                                     </tr>

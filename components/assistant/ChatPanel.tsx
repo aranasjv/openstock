@@ -69,7 +69,7 @@ export default function ChatPanel({ conversation, providerLabel }: ChatPanelProp
         return (
             <div className="flex h-full flex-col items-center justify-center gap-3 rounded-xl border border-gray-800 bg-gray-900/30 p-10 text-center">
                 <p className="text-sm text-gray-400">No conversation selected</p>
-                <p className="max-w-sm text-xs text-gray-600">
+                <p className="max-w-sm text-xs text-gray-500">
                     Start a new conversation to ask about stocks, crypto, the screener or your holdings.
                 </p>
             </div>
@@ -80,7 +80,7 @@ export default function ChatPanel({ conversation, providerLabel }: ChatPanelProp
         <div className="flex h-full flex-col overflow-hidden rounded-xl border border-gray-800 bg-gray-900/30">
             <div className="flex shrink-0 items-center justify-between border-b border-gray-800 px-4 py-2.5">
                 <h2 className="truncate text-sm font-semibold text-white">{conversation.title}</h2>
-                <span className="shrink-0 text-[10px] uppercase tracking-wider text-gray-600">
+                <span className="shrink-0 text-[10px] uppercase tracking-wider text-gray-500">
                     {providerLabel}
                 </span>
             </div>
@@ -137,7 +137,7 @@ export default function ChatPanel({ conversation, providerLabel }: ChatPanelProp
                                                     <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-yellow-600" />
                                                 )}
                                                 <span className="font-mono text-gray-400">{entry.name}</span>
-                                                <span className="text-gray-600">{entry.summary}</span>
+                                                <span className="text-gray-500">{entry.summary}</span>
                                             </li>
                                         ))}
                                     </ul>
@@ -181,18 +181,19 @@ export default function ChatPanel({ conversation, providerLabel }: ChatPanelProp
                     }}
                     rows={2}
                     placeholder="Ask about stocks, crypto, the screener or your holdings…"
-                    className="min-h-[42px] flex-1 resize-none rounded-md border border-gray-800 bg-[#1C1C1F] px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:border-teal-700 focus:outline-none"
+                    className="min-h-[42px] flex-1 resize-none rounded-md border border-gray-800 bg-[#1C1C1F] px-3 py-2 text-sm text-white placeholder:text-gray-500 focus:border-teal-700 focus:outline-none"
                 />
                 <Button
                     type="submit"
                     disabled={pending || !input.trim()}
+                    aria-label="Send message"
                     className="h-[42px] bg-teal-600 px-3 text-white hover:bg-teal-500"
                 >
                     <Send className="h-4 w-4" />
                 </Button>
             </form>
 
-            <p className="shrink-0 border-t border-gray-800 px-3 py-2 text-[10px] leading-relaxed text-gray-600">
+            <p className="shrink-0 border-t border-gray-800 px-3 py-2 text-[10px] leading-relaxed text-gray-500">
                 Answers are generated from the data shown in each lookup. This is not investment advice —
                 the assistant can report what a screen or indicator shows, not what to buy.
             </p>

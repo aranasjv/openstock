@@ -20,7 +20,7 @@ function ChartUnavailable({ label }: { label: string }) {
     return (
         <div className="flex h-full min-h-[180px] flex-col items-center justify-center gap-2 rounded-xl border border-gray-800 bg-gray-900/30 p-6 text-center">
             <p className="text-sm text-gray-400">{label} chart unavailable</p>
-            <p className="max-w-sm text-xs text-gray-600">
+            <p className="max-w-sm text-xs text-gray-500">
                 TradingView has no matching pair for this coin, so no chart is shown rather than
                 an &quot;Invalid Symbol&quot; placeholder. Price data above comes from CoinGecko.
             </p>

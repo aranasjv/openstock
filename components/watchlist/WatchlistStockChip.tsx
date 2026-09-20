@@ -41,7 +41,7 @@ export default function WatchlistStockChip({ symbol }: WatchlistStockChipProps) 
     };
 
     return (
-        <div className="group flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700/80 rounded-full border border-gray-700 transition-all">
+        <div className="group flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700/80 rounded-full border border-gray-700 transition">
             <span className="font-semibold text-sm text-white">{symbol}</span>
 
             {/* Divider */}

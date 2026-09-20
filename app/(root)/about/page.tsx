@@ -89,7 +89,7 @@ export default function AboutPage() {
             {/* Team / Contributors */}
             <section className="text-center mb-20">
                 <h2 className="text-3xl font-bold text-white mb-10">Backed by Amazing Partners</h2>
-                <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-80 grayscale hover:grayscale-0 transition-all duration-500">
+                <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-80 grayscale hover:grayscale-0 transition duration-500">
                     <div className="h-8 w-px bg-gray-700"></div>
                     <Link href="https://www.siray.ai" target="_blank" className="hover:opacity-100 transition-opacity flex items-center gap-2">
                         <img src="/assets/icons/siray.svg" alt="Siray" className="h-6 w-auto invert brightness-0" />
@@ -111,7 +111,7 @@ function FeatureCard({ icon, title, desc, color }: any) {
     };
 
     return (
-        <div className={`bg-gray-900/50 border border-gray-800 p-8 rounded-2xl transition-all duration-300 hover:-translate-y-1 ${borders[color]}`}>
+        <div className={`bg-gray-900/50 border border-gray-800 p-8 rounded-2xl transition duration-300 hover:-translate-y-1 ${borders[color]}`}>
             <div className="mb-6 p-3 bg-gray-800 w-fit rounded-xl">{icon}</div>
             <h3 className="text-xl font-bold text-white mb-3">{title}</h3>
             <p className="text-gray-400 leading-relaxed font-light">{desc}</p>
@@ -124,7 +124,7 @@ function SocialButton({ href, icon, label }: any) {
         <a
             href={href}
             target="_blank"
-            className="flex items-center gap-3 px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl transition-all duration-200 border border-gray-700 hover:border-gray-600 font-medium"
+            className="flex items-center gap-3 px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl transition duration-200 border border-gray-700 hover:border-gray-600 font-medium"
         >
             {icon}
             <span>{label}</span>

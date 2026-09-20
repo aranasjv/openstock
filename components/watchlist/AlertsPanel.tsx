@@ -61,7 +61,9 @@ export default function AlertsPanel({ alerts, onRefresh }: AlertsPanelProps) {
                                 </div>
                                 <div className="flex flex-col space-y-2">
                                     <button
+                                        type="button"
                                         onClick={() => handleDelete(alert._id)}
+                                        aria-label={`Delete alert for ${alert.symbol}`}
                                         className="text-gray-500 hover:text-red-500 transition-colors p-1"
                                     >
                                         <Trash2 className="w-4 h-4" />

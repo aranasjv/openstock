@@ -1,4 +1,5 @@
 import { loadConfig } from '@/lib/config';
+import { fetchWithTimeout } from '@/lib/http';
 
 const KIT_API_URL = 'https://api.kit.com/v4';
 
@@ -32,7 +33,7 @@ export const kit = {
         }
 
         try {
-            const response = await fetch(`https://api.convertkit.com/v3/forms/${targetFormId}/subscribe`, {
+            const response = await fetchWithTimeout(`https://api.convertkit.com/v3/forms/${targetFormId}/subscribe`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -66,7 +67,7 @@ export const kit = {
     sendBroadcast: async (subject: string, content: string) => {
         const { apiKey, apiSecret } = await getConfig();
         try {
-            const response = await fetch(`https://api.convertkit.com/v3/broadcasts`, {
+            const response = await fetchWithTimeout(`https://api.convertkit.com/v3/broadcasts`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -105,7 +106,7 @@ export const kit = {
     listSubscribers: async () => {
         const { apiKey, apiSecret } = await getConfig();
         try {
-            const response = await fetch(`https://api.convertkit.com/v3/subscribers?api_secret=${apiSecret}`, {
+            const response = await fetchWithTimeout(`https://api.convertkit.com/v3/subscribers?api_secret=${apiSecret}`, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
             });

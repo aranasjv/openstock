@@ -71,7 +71,7 @@ const NavItems = ({
             <li key="donate">
                 <Button
                     onClick={openDonatePopup}
-                    className="bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-semibold px-4 py-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 flex items-center gap-2 animate-pulse"
+                    className="bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-semibold px-4 py-2 rounded-lg shadow-lg hover:shadow-xl transition duration-200 transform hover:scale-105 flex items-center gap-2 animate-pulse"
                     size="sm"
                 >
                     <Heart className="h-4 w-4 fill-current" />

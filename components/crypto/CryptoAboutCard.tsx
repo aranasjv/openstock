@@ -102,7 +102,7 @@ export default function CryptoAboutCard({ coin }: CryptoAboutCardProps) {
 function Stat({ label, value }: { label: string; value: string }) {
     return (
         <div>
-            <div className="text-[10px] uppercase tracking-wider text-gray-600">{label}</div>
+            <div className="text-[10px] uppercase tracking-wider text-gray-500">{label}</div>
             <div className="mt-0.5 font-mono text-sm text-gray-200">{value}</div>
         </div>
     );

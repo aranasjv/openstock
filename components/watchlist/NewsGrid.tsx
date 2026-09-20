@@ -30,7 +30,7 @@ export default function NewsGrid({ news }: NewsGridProps) {
                                     }`}>
                                     {item.related || "MARKET"}
                                 </span>
-                                <ExternalLink className="w-3 h-3 text-gray-600 group-hover:text-gray-400" />
+                                <ExternalLink className="w-3 h-3 text-gray-500 group-hover:text-gray-400" />
                             </div>
                             <h3 className="text-sm font-semibold text-gray-200 mb-2 line-clamp-2 group-hover:text-blue-400 transition-colors">
                                 {item.headline}
@@ -38,7 +38,7 @@ export default function NewsGrid({ news }: NewsGridProps) {
                             <p className="text-xs text-gray-500 line-clamp-3 mb-4 flex-1">
                                 {item.summary}
                             </p>
-                            <div className="flex items-center justify-between text-[10px] text-gray-600 mt-auto">
+                            <div className="flex items-center justify-between text-[10px] text-gray-500 mt-auto">
                                 <span>{item.source}</span>
                                 <span>
                                     {item.datetime ? formatDistanceToNow(item.datetime * 1000, { addSuffix: true }) : ''}

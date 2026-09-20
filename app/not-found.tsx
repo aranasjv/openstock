@@ -14,7 +14,7 @@ export default function NotFound() {
             </p>
             <Link
                 href="/"
-                className="rounded-lg bg-gradient-to-r from-teal-500 to-cyan-500 px-5 py-2.5 font-semibold text-white transition-all hover:from-teal-600 hover:to-cyan-600"
+                className="rounded-lg bg-gradient-to-r from-teal-500 to-cyan-500 px-5 py-2.5 font-semibold text-white transition hover:from-teal-600 hover:to-cyan-600"
             >
                 Back to dashboard
             </Link>

@@ -44,7 +44,7 @@ export default async function SettingsPage() {
 
             <NotificationActions />
 
-            <p className="text-xs text-gray-600">
+            <p className="text-xs text-gray-500">
                 Secrets are stored in MongoDB and never sent to the browser — only a masked
                 form is displayed here.
             </p>

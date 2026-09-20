@@ -132,7 +132,7 @@ export default function WatchlistTable({ data, onRefresh }: WatchlistTableProps)
                                             currentPrice={stock.price}
                                             onAlertCreated={onRefresh}
                                         >
-                                            <button className="p-2.5 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-all border border-transparent hover:border-white/10" title="Add Alert">
+                                            <button className="p-2.5 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition border border-transparent hover:border-white/10" title="Add Alert">
                                                 <Bell className="w-4.5 h-4.5" />
                                             </button>
                                         </CreateAlertModal>

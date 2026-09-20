@@ -130,7 +130,7 @@ export default function HoldingsManager({ holdings }: HoldingsManagerProps) {
                         value={symbol}
                         onChange={(e) => setSymbol(e.target.value)}
                         placeholder={assetType === 'crypto' ? 'bitcoin' : 'AAPL'}
-                        className="h-9 rounded-md border border-gray-800 bg-[#1C1C1F] px-3 font-mono text-sm text-white placeholder:text-gray-600"
+                        className="h-9 rounded-md border border-gray-800 bg-[#1C1C1F] px-3 font-mono text-sm text-white placeholder:text-gray-500"
                     />
                     <datalist id="holding-symbols">
                         {suggestions.map((s) => (
@@ -147,7 +147,7 @@ export default function HoldingsManager({ holdings }: HoldingsManagerProps) {
                         value={quantity}
                         onChange={(e) => setQuantity(e.target.value)}
                         placeholder="Quantity"
-                        className="h-9 rounded-md border border-gray-800 bg-[#1C1C1F] px-3 text-sm text-white placeholder:text-gray-600"
+                        className="h-9 rounded-md border border-gray-800 bg-[#1C1C1F] px-3 text-sm text-white placeholder:text-gray-500"
                     />
 
                     <div className="flex gap-2">
@@ -158,12 +158,13 @@ export default function HoldingsManager({ holdings }: HoldingsManagerProps) {
                             value={averageCost}
                             onChange={(e) => setAverageCost(e.target.value)}
                             placeholder="Avg cost"
-                            className="h-9 w-full rounded-md border border-gray-800 bg-[#1C1C1F] px-3 text-sm text-white placeholder:text-gray-600"
+                            className="h-9 w-full rounded-md border border-gray-800 bg-[#1C1C1F] px-3 text-sm text-white placeholder:text-gray-500"
                         />
                         <Button
                             type="button"
                             onClick={handleAdd}
                             disabled={pending}
+                            aria-label="Add holding"
                             className="h-9 shrink-0 bg-teal-600 px-3 text-white hover:bg-teal-500"
                         >
                             <Plus className="h-4 w-4" />
@@ -171,7 +172,7 @@ export default function HoldingsManager({ holdings }: HoldingsManagerProps) {
                     </div>
                 </div>
 
-                <p className="mt-2 text-[11px] text-gray-600">
+                <p className="mt-2 text-[11px] text-gray-500">
                     Average cost is the blended price per unit, used to compute profit and loss.
                 </p>
             </div>
@@ -217,7 +218,7 @@ export default function HoldingsManager({ holdings }: HoldingsManagerProps) {
                                         </td>
                                         <td className="px-4 py-3 text-right">
                                             {row.pnl === null ? (
-                                                <span className="text-gray-600">—</span>
+                                                <span className="text-gray-500">—</span>
                                             ) : (
                                                 <span className={row.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}>
                                                     {row.pnl >= 0 ? '+' : ''}
@@ -232,6 +233,7 @@ export default function HoldingsManager({ holdings }: HoldingsManagerProps) {
                                                 onClick={() => handleRemove(row)}
                                                 disabled={pending}
                                                 title="Remove holding"
+                                                aria-label={`Remove ${row.symbol}`}
                                                 className="text-gray-500 transition-colors hover:text-red-400"
                                             >
                                                 <Trash2 className="h-4 w-4" />

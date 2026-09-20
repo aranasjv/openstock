@@ -60,7 +60,7 @@ const TradingViewWidget = ({
     return (
         <div
             className={cn(
-                "w-full transition-all duration-300",
+                "w-full transition duration-300",
                 fill && !isExpanded && "h-full min-h-0",
                 isExpanded && "fixed inset-0 z-[9999] bg-background"
             )}
@@ -76,7 +76,7 @@ const TradingViewWidget = ({
                         size="icon"
                         onClick={toggleExpand}
                         className={cn(
-                            "absolute top-2 right-2 z-10 hover:bg-background/50 text-muted-foreground hover:text-foreground transition-all duration-200",
+                            "absolute top-2 right-2 z-10 hover:bg-background/50 text-muted-foreground hover:text-foreground transition duration-200",
                             !isExpanded ? "opacity-0 group-hover:opacity-100" : "bg-background/20"
                         )}
                         title={isExpanded ? "Minimize" : "Click to expand"}

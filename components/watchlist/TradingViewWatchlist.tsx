@@ -64,7 +64,7 @@ function TradingViewWatchlist({
                 {symbolList.length === 0 ? (
                     <div className="flex h-[550px] flex-col items-center justify-center gap-2 p-6 text-center">
                         <p className="text-sm text-gray-400">No chartable symbols yet</p>
-                        <p className="max-w-sm text-xs text-gray-600">
+                        <p className="max-w-sm text-xs text-gray-500">
                             Add a stock or coin and it will appear here.
                         </p>
                     </div>

@@ -82,6 +82,14 @@ the authorisation"). That is A11's recommendation applied.
 Cross-referenced against `vercel-react-best-practices`, which ships 70 rules in 8 categories.
 The rule ids below are the ones that actually bite here.
 
+**Resolved in P1.** *A1* — `lib/http.ts` (`fetchWithTimeout`); model calls take a longer
+deadline than data APIs, and the error deliberately never echoes the URL, because Gemini and Kit
+put their keys in the query string. *A2* — the data-layer readers in `lib/data/*` now throw
+instead of returning `[]`/`false`, so an outage reaches the error boundary rather than rendering
+as an empty portfolio. *A7* — malformed ids are rejected before Mongoose sees them. *A9* —
+`lib/validate.ts` at the action boundary. Every other outbound call already had its own
+`AbortController`, so A1 was exactly the three named.
+
 ### Reliability
 
 | # | Finding | Evidence | Rule | Fix |
@@ -341,6 +349,15 @@ Palette note (`app/globals.css:118-122`): `gray-900 #050505`, `gray-800 #141414`
 `gray-700 #212328`, `gray-600 #30333A`, `gray-500 #9095A1`. So **`gray-500` is ~6.8:1 (fine)**
 but **`gray-600` ~1.6:1 and `gray-700` ~1.2:1 — effectively invisible.**
 
+**Resolved in P1.** *U1* — every `text-gray-600`/`text-gray-700` under `components/` and `app/`
+is now `text-gray-500` (25 files, 0 remaining). Borders and backgrounds were deliberately left
+alone: only *text* at 1.6:1 is unreadable, and re-tinting `gray-700` would have redesigned every
+border in the app. *U2* — one base `:where(...):focus-visible` rule in `globals.css` rather than
+per-component classes; `:where()` keeps specificity at zero, so the shadcn primitives keep their
+own treatment. *U3* — `aria-label` on the send, add-holding and delete-alert buttons. *U12* —
+`color-scheme: dark`. *U13* — `transition-all` → `transition` (Tailwind's `transition` is a
+curated property list, so this satisfies "list properties explicitly").
+
 ### Blockers
 
 | # | Finding | Rule | Evidence |
@@ -392,8 +409,8 @@ generated-page tell, and at `gray-700` currently invisible anyway.
 
 | Priority | Items |
 |---|---|
-| **P0 — now** | S1–S4 (access control) + the authorization tests (A11) in the same change. |
-| **P1 — next** | UI blockers U1, U2, U3, U12, U13 (cheap, app-wide); A1 (fetch timeouts); A2 (degrade honestly); A7/A9 (validate + guard). |
+| **P0 — done** | S1–S4 (access control) + the authorization tests (A11) in the same change. |
+| **P1 — done** | UI blockers U1, U2, U3, U12, U13 (cheap, app-wide); A1 (fetch timeouts); A2 (degrade honestly); A7/A9 (validate + guard). |
 | **P2 — the AI layer** | §2.9 phase A (bridge + two tools) → phase B (`position-sizer`, `crypto-regime-analyzer`, relative strength); U4–U9, U14, U15, A6, A10. |
 | **P3 — persistence** | §2.6 thesis/journal model, then the four skills it unlocks. |
 | **P4 — depth** | Phases E–F: equity breadth, uptrend, exposure-coach; VCP/CANSLIM engines; backtest engine. |

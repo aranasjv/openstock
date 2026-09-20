@@ -22,12 +22,12 @@ export default function Error({
                 An unexpected error occurred while loading this page.
             </p>
             {error.digest ? (
-                <p className="text-xs text-gray-600">Reference: {error.digest}</p>
+                <p className="text-xs text-gray-500">Reference: {error.digest}</p>
             ) : null}
             <button
                 type="button"
                 onClick={() => reset()}
-                className="rounded-lg bg-gradient-to-r from-teal-500 to-cyan-500 px-5 py-2.5 font-semibold text-white transition-all hover:from-teal-600 hover:to-cyan-600"
+                className="rounded-lg bg-gradient-to-r from-teal-500 to-cyan-500 px-5 py-2.5 font-semibold text-white transition hover:from-teal-600 hover:to-cyan-600"
             >
                 Try again
             </button>

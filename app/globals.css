@@ -133,11 +133,31 @@
 }
 
 @layer base {
+    html {
+        /*
+         * Native UI follows the theme. Without this, Windows renders light scrollbars and
+         * white form-control chrome against a near-black shell.
+         */
+        color-scheme: dark;
+    }
     * {
         @apply border-border outline-ring/50;
     }
     body {
         @apply bg-gray-900 text-foreground;
+    }
+    /*
+     * One focus rule rather than a class on every component. The hand-rolled controls —
+     * sidebar nav, screener rows, watchlist tabs, chip buttons — had no focus style at all,
+     * because only the shadcn primitives in ui/* carry a ring. Keyboard users could not see
+     * where they were.
+     *
+     * `:where()` keeps specificity at zero, so a component that defines its own focus
+     * treatment still wins and this acts purely as the default it was missing.
+     */
+    :where(a, button, [role='button'], [tabindex]:not([tabindex='-1']), input, select, textarea, summary):focus-visible {
+        outline: 2px solid var(--color-teal-400);
+        outline-offset: 2px;
     }
 }
 
@@ -188,7 +208,7 @@
         @apply text-sm font-medium text-gray-400;
     }
     .form-input {
-        @apply h-12 px-3 py-3 text-white text-base placeholder:text-gray-600 border-gray-600  rounded-lg focus:!border-teal-500 focus:ring-0 ;
+        @apply h-12 px-3 py-3 text-white text-base placeholder:text-gray-500 border-gray-600  rounded-lg focus:!border-teal-500 focus:ring-0 ;
     }
     .select-trigger {
         @apply w-full !h-12 px-3 py-3 text-base border-gray-600 bg-gray-800 text-white rounded-lg focus:!border-teal-500 focus:ring-0;

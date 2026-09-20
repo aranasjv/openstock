@@ -54,7 +54,7 @@ export default function ConversationList({ conversations, activeId }: Conversati
 
             <div className="min-h-0 flex-1 overflow-y-auto">
                 {conversations.length === 0 ? (
-                    <p className="p-3 text-xs text-gray-600">No conversations yet.</p>
+                    <p className="p-3 text-xs text-gray-500">No conversations yet.</p>
                 ) : (
                     <ul>
                         {conversations.map((conversation) => {
@@ -72,7 +72,7 @@ export default function ConversationList({ conversations, activeId }: Conversati
                                     >
                                         <MessageSquare className="h-3.5 w-3.5 shrink-0" />
                                         <span className="truncate">{conversation.title}</span>
-                                        <span className="ml-auto shrink-0 text-[10px] text-gray-600">
+                                        <span className="ml-auto shrink-0 text-[10px] text-gray-500">
                                             {conversation.messageCount}
                                         </span>
                                     </button>
@@ -81,7 +81,8 @@ export default function ConversationList({ conversations, activeId }: Conversati
                                         onClick={() => handleDelete(conversation.id)}
                                         disabled={pending}
                                         title="Delete conversation"
-                                        className="mr-2 shrink-0 text-gray-700 opacity-0 transition-opacity hover:text-red-400 group-hover:opacity-100"
+                                        aria-label={`Delete ${conversation.title}`}
+                                        className="mr-2 shrink-0 text-gray-500 opacity-0 transition-opacity hover:text-red-400 group-hover:opacity-100"
                                     >
                                         <Trash2 className="h-3.5 w-3.5" />
                                     </button>

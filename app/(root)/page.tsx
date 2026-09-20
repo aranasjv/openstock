@@ -38,7 +38,7 @@ const Home = async ({ searchParams }: HomeProps) => {
                     <h1 className="bg-clip-text text-lg font-bold text-transparent bg-gradient-to-r from-white to-gray-500">
                         Stocks
                     </h1>
-                    <span className="text-[11px] text-gray-600">
+                    <span className="text-[11px] text-gray-500">
                         Live indices, heatmap and the Must Buy screen
                     </span>
                 </div>

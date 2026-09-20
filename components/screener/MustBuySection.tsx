@@ -37,7 +37,7 @@ export default async function MustBuySection({ assetType, strategyId }: MustBuyS
                             {assetType === 'crypto' ? 'crypto' : 'stocks'}
                         </span>
                     </h2>
-                    <p className="text-[11px] text-gray-600">
+                    <p className="text-[11px] text-gray-500">
                         {result.scanned} scanned · {ranked.length} matched · {strongCount} strong
                     </p>
                 </div>
@@ -46,7 +46,7 @@ export default async function MustBuySection({ assetType, strategyId }: MustBuyS
                     <StrategySelect strategies={result.strategies} selected={selected} />
                 </Suspense>
 
-                <p className="flex items-start gap-1.5 text-[11px] leading-snug text-gray-600">
+                <p className="flex items-start gap-1.5 text-[11px] leading-snug text-gray-500">
                     <Info className="mt-0.5 h-3 w-3 shrink-0" />
                     <span>
                         Rule-based technical screen, not investment advice. Expand a row to see which

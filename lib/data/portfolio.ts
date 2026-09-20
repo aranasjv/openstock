@@ -55,7 +55,10 @@ export async function getHoldingsForUser(userId: string, assetType?: HoldingAsse
         return JSON.parse(JSON.stringify(holdings));
     } catch (error) {
         console.error('Error fetching holdings:', error);
-        return [];
+        // Rethrow rather than returning []. Swallowing it made a database outage
+        // indistinguishable from "you hold nothing", which is the wrong thing to tell
+        // someone about their portfolio.
+        throw new Error('Could not load holdings.');
     }
 }
 
@@ -203,6 +206,7 @@ export async function getPortfolioSummaryForUser(
         };
     } catch (error) {
         console.error('Error building portfolio summary:', error);
-        return empty;
+        // See getHoldingsForUser: a failure must not read as a zeroed portfolio.
+        throw new Error('Could not build the portfolio summary.');
     }
 }

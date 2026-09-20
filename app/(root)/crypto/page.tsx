@@ -47,7 +47,7 @@ export default async function CryptoDashboard({ searchParams }: CryptoDashboardP
                     <h1 className="bg-clip-text text-lg font-bold text-transparent bg-gradient-to-r from-white to-gray-500">
                         Crypto
                     </h1>
-                    <span className="text-[11px] text-gray-600">
+                    <span className="text-[11px] text-gray-500">
                         Live prices and charts for the top coins
                     </span>
                 </div>

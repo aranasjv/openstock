@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { requireUserId } from '@/lib/session';
+import { requireNumber, requireOneOf, requireText, MAX_SYMBOL_LENGTH } from '@/lib/validate';
 import {
     createAlertForUser,
     deleteAlertForUser,
@@ -18,14 +19,22 @@ import {
  * caller could delete or pause any alert on the deployment just by sending its id.
  */
 
+const ASSET_TYPES = ['stock', 'crypto'] as const;
+
 export async function createAlert(params: {
-    symbol: string;
-    targetPrice: number;
-    condition: 'ABOVE' | 'BELOW';
-    assetType?: AlertAssetType;
+    symbol: unknown;
+    targetPrice: unknown;
+    condition: unknown;
+    assetType?: unknown;
 }) {
     const userId = await requireUserId();
-    const alert = await createAlertForUser(userId, params);
+
+    const alert = await createAlertForUser(userId, {
+        symbol: requireText(params.symbol, 'Symbol', MAX_SYMBOL_LENGTH).toUpperCase(),
+        targetPrice: requireNumber(params.targetPrice, 'Target price', { min: 0 }),
+        condition: requireOneOf(params.condition, 'Condition', ['ABOVE', 'BELOW'] as const),
+        assetType: requireOneOf(params.assetType ?? 'stock', 'Asset type', ASSET_TYPES),
+    });
 
     revalidatePath('/watchlist');
     revalidatePath('/holdings');

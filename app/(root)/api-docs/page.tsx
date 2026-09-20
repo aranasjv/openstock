@@ -30,7 +30,7 @@ export default function ApiDocsPage() {
           <div className="bg-gray-800 p-3 rounded-2xl border border-gray-700 shadow-xl">
             <img src="/assets/images/logo.png" alt="openstock" className="h-10 w-auto invert brightness-0" />
           </div>
-          <span className="text-gray-600 text-2xl">+</span>
+          <span className="text-gray-500 text-2xl">+</span>
           <div className="bg-gray-800 p-3 rounded-2xl border border-gray-700 shadow-xl">
             <img src="/assets/icons/siray.svg" alt="Siray" className="h-10 w-auto invert brightness-0" />
           </div>
@@ -223,7 +223,7 @@ function JobCard({ icon, title, trigger, desc, color }: any) {
   };
 
   return (
-    <div className={`p-5 rounded-xl border transition-all duration-300 ${colorClasses[color]}`}>
+    <div className={`p-5 rounded-xl border transition duration-300 ${colorClasses[color]}`}>
       <div className="mb-4">{icon}</div>
       <h3 className="font-bold text-gray-100 text-lg mb-1">{title}</h3>
       <div className="text-xs font-mono opacity-70 mb-3 uppercase tracking-wider">{trigger}</div>
@@ -235,12 +235,12 @@ function JobCard({ icon, title, trigger, desc, color }: any) {
 function StackItem({ title, desc, url }: any) {
   return (
     <Link href={url} target="_blank" className="block group">
-      <div className="bg-gray-800/40 hover:bg-gray-800 p-6 rounded-xl border border-gray-700 hover:border-gray-600 transition-all flex items-center justify-between">
+      <div className="bg-gray-800/40 hover:bg-gray-800 p-6 rounded-xl border border-gray-700 hover:border-gray-600 transition flex items-center justify-between">
         <div>
           <h3 className="text-xl font-bold text-gray-200 group-hover:text-teal-400 transition-colors">{title}</h3>
           <p className="text-gray-500 mt-1">{desc}</p>
         </div>
-        <ArrowRight className="text-gray-600 group-hover:text-teal-400 transition-colors" />
+        <ArrowRight className="text-gray-500 group-hover:text-teal-400 transition-colors" />
       </div>
     </Link>
   );

@@ -42,7 +42,7 @@ export default function StrategySelect({ strategies, selected }: StrategySelectP
                 ))}
             </select>
             {active?.summary ? (
-                <p className="truncate text-[11px] text-gray-600" title={active.summary}>
+                <p className="truncate text-[11px] text-gray-500" title={active.summary}>
                     {active.summary}
                 </p>
             ) : null}

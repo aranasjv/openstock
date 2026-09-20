@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { connectToDatabase } from '@/database/mongoose';
 import { requireUserId } from '@/lib/session';
+import { isObjectId, requireText } from '@/lib/validate';
 import {
     ConversationModel,
     MAX_CONVERSATION_MESSAGES,
@@ -60,6 +61,11 @@ export async function listConversations(): Promise<ConversationSummary[]> {
 
 export async function getConversation(id: string): Promise<ConversationDetail | null> {
     const userId = await requireUserId();
+
+    // A malformed id cannot match anything, and letting Mongoose try throws a CastError that
+    // reaches the user as an opaque 500.
+    if (!isObjectId(id)) return null;
+
     await connectToDatabase();
 
     // The userId in the filter is the authorisation check, not just a lookup key.
@@ -84,15 +90,21 @@ export async function getConversation(id: string): Promise<ConversationDetail | 
 
 export async function createConversation(title = 'New conversation'): Promise<string> {
     const userId = await requireUserId();
+
+    // The title is written straight into a document and the client may omit or blank it.
+    const safeTitle = title?.trim() ? requireText(title, 'Title', 120) : 'New conversation';
+
     await connectToDatabase();
 
-    const doc = await ConversationModel.create({ userId, title, messages: [] });
+    const doc = await ConversationModel.create({ userId, title: safeTitle, messages: [] });
     revalidatePath('/assistant');
     return String(doc._id);
 }
 
 export async function deleteConversation(id: string): Promise<{ success: boolean }> {
     const userId = await requireUserId();
+    if (!isObjectId(id)) return { success: false };
+
     await connectToDatabase();
 
     await ConversationModel.deleteOne({ _id: id, userId });

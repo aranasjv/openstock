@@ -32,7 +32,7 @@ function rsiBand(rsi: number | null): { label: string; className: string; tone: 
     if (rsi <= 30) return { label, className: 'bg-emerald-950/60 text-emerald-300', tone: 'Oversold' };
     if (rsi <= 40) return { label, className: 'bg-emerald-950/30 text-emerald-400/80', tone: 'Approaching oversold' };
     if (rsi >= 70) return { label, className: 'bg-red-950/50 text-red-300', tone: 'Overbought' };
-    return { label, className: 'text-gray-600', tone: 'Neutral' };
+    return { label, className: 'text-gray-500', tone: 'Neutral' };
 }
 
 export default function CandidateRow({ rank, candidate, assetType, strategyId }: CandidateRowProps) {
@@ -72,7 +72,7 @@ export default function CandidateRow({ rank, candidate, assetType, strategyId }:
     return (
         <div className="border-b border-gray-800/60 last:border-0">
             <div className="flex items-center gap-2 px-3 py-2">
-                <span className="w-5 shrink-0 text-[11px] text-gray-600">{rank}</span>
+                <span className="w-5 shrink-0 text-[11px] text-gray-500">{rank}</span>
 
                 {/* Separate toggle so expansion stays reachable for crypto rows, where the
                     name opens the drawer. */}
@@ -99,7 +99,7 @@ export default function CandidateRow({ rank, candidate, assetType, strategyId }:
                     <span className="truncate text-sm font-medium text-gray-100 hover:text-teal-300">
                         {candidate.name}
                     </span>
-                    <span className="shrink-0 text-[11px] text-gray-600">
+                    <span className="shrink-0 text-[11px] text-gray-500">
                         {candidate.matched}/{candidate.total}
                     </span>
                 </button>
@@ -140,14 +140,14 @@ export default function CandidateRow({ rank, candidate, assetType, strategyId }:
                             <li key={criterion.label} className="flex items-start gap-2 text-xs">
                                 <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />
                                 <span className="text-gray-300">{criterion.label}</span>
-                                <span className="ml-auto font-mono text-gray-600">{criterion.detail}</span>
+                                <span className="ml-auto font-mono text-gray-500">{criterion.detail}</span>
                             </li>
                         ))}
                         {candidate.failed.map((criterion) => (
                             <li key={criterion.label} className="flex items-start gap-2 text-xs">
-                                <X className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-600" />
+                                <X className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-500" />
                                 <span className="text-gray-500">{criterion.label}</span>
-                                <span className="ml-auto font-mono text-gray-600">{criterion.detail}</span>
+                                <span className="ml-auto font-mono text-gray-500">{criterion.detail}</span>
                             </li>
                         ))}
                     </ul>
@@ -185,7 +185,7 @@ export default function CandidateRow({ rank, candidate, assetType, strategyId }:
                                 {explanation}
                             </p>
                             {explainMeta?.framework ? (
-                                <p className="mt-2 border-t border-gray-800 pt-2 text-[10px] text-gray-600">
+                                <p className="mt-2 border-t border-gray-800 pt-2 text-[10px] text-gray-500">
                                     {explainMeta.framework}
                                     {explainMeta.provider ? ` · ${explainMeta.provider}` : ''} · AI-written
                                     commentary on the figures above, not advice

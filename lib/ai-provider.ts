@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { loadConfig } from '@/lib/config';
+import { AI_TIMEOUT_MS, fetchWithTimeout } from '@/lib/http';
 
 /**
  * AI provider abstraction for OpenStock.
@@ -21,6 +22,13 @@ import { loadConfig } from '@/lib/config';
 export type AIProviderName = 'gemini' | 'deepseek' | 'minimax' | 'siray';
 
 export const AI_PROVIDER_NAMES: AIProviderName[] = ['gemini', 'deepseek', 'minimax', 'siray'];
+
+/**
+ * Model calls get a longer deadline than the data-API default: a slow generation is a normal
+ * outcome, whereas a slow quote lookup is a fault. Without a bound at all, a provider that
+ * accepts the connection and then stalls holds the request open indefinitely.
+ */
+const aiFetch = (input: string, init: RequestInit) => fetchWithTimeout(input, init, AI_TIMEOUT_MS);
 
 export interface AIProviderConfig {
     name: AIProviderName;
@@ -130,7 +138,7 @@ async function callGemini(
         body.generationConfig = { temperature: options.temperature };
     }
 
-    const res = await fetch(url, {
+    const res = await aiFetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -167,7 +175,7 @@ async function callOpenAICompatible(
     }
     messages.push({ role: 'user', content: prompt });
 
-    const res = await fetch(url, {
+    const res = await aiFetch(url, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -266,7 +274,7 @@ async function callOpenAICompatibleWithTools(
         throw new Error(`${config.name.toUpperCase()}_API_KEY is not set`);
     }
 
-    const res = await fetch(`${config.baseUrl}/chat/completions`, {
+    const res = await aiFetch(`${config.baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -381,7 +389,7 @@ async function callGeminiWithTools(
         body.generationConfig = { temperature: options.temperature };
     }
 
-    const res = await fetch(`${config.baseUrl}/${config.model}:generateContent?key=${config.apiKey}`, {
+    const res = await aiFetch(`${config.baseUrl}/${config.model}:generateContent?key=${config.apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

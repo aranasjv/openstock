@@ -52,7 +52,7 @@ export default function CryptoSentimentCard({ up, down, market }: CryptoSentimen
         <section className="rounded-xl border border-gray-800 bg-gray-900/30 p-4">
             <div className="mb-3 flex items-center gap-2">
                 <h2 className="text-sm font-semibold text-white">Sentiment</h2>
-                <Info className="h-3 w-3 text-gray-600" />
+                <Info className="h-3 w-3 text-gray-500" />
             </div>
 
             {hasVotes ? (
@@ -76,7 +76,7 @@ export default function CryptoSentimentCard({ up, down, market }: CryptoSentimen
                     </div>
                 </div>
             ) : (
-                <p className="text-[11px] text-gray-600">No community votes available for this coin.</p>
+                <p className="text-[11px] text-gray-500">No community votes available for this coin.</p>
             )}
 
             {hasMarket ? (
@@ -90,7 +90,7 @@ export default function CryptoSentimentCard({ up, down, market }: CryptoSentimen
                     <p className={`mt-0.5 text-[11px] ${fearGreedTone(market!.value)}`}>
                         {market!.classification}
                     </p>
-                    <p className="mt-1.5 text-[10px] text-gray-700">
+                    <p className="mt-1.5 text-[10px] text-gray-500">
                         Market-wide, not specific to this coin. Hourly from alternative.me.
                     </p>
                 </div>

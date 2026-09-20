@@ -88,7 +88,7 @@ export default function CreateAlertModal({
                             value={alertName}
                             onChange={(e) => setAlertName(e.target.value)}
                             placeholder="e.g. Apple at Discount"
-                            className="bg-gray-900 border-gray-700 text-white placeholder:text-gray-600 focus:border-yellow-500 focus:ring-yellow-500/20 transition-all rounded-md h-10"
+                            className="bg-gray-900 border-gray-700 text-white placeholder:text-gray-500 focus:border-yellow-500 focus:ring-yellow-500/20 transition rounded-md h-10"
                         />
                     </div>
 
@@ -144,7 +144,7 @@ export default function CreateAlertModal({
                                 value={targetPrice}
                                 onChange={(e) => setTargetPrice(e.target.value)}
                                 placeholder="eg: 140"
-                                className="pl-7 bg-[#1C1C1F] border-gray-800 text-white placeholder:text-gray-600 focus:border-yellow-500 focus:ring-yellow-500/20 transition-all rounded-md h-10 font-mono"
+                                className="pl-7 bg-[#1C1C1F] border-gray-800 text-white placeholder:text-gray-500 focus:border-yellow-500 focus:ring-yellow-500/20 transition rounded-md h-10 font-mono"
                             />
                         </div>
                     </div>
@@ -161,7 +161,7 @@ export default function CreateAlertModal({
                         <Button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-[#FACC15] hover:bg-[#EAB308] text-black font-bold h-11 text-base transition-all shadow-[0_0_15px_rgba(250,204,21,0.2)]"
+                            className="w-full bg-[#FACC15] hover:bg-[#EAB308] text-black font-bold h-11 text-base transition shadow-[0_0_15px_rgba(250,204,21,0.2)]"
                         >
                             {loading ? "Creating Alert..." : "Create Alert"}
                         </Button>

@@ -157,12 +157,12 @@ export default function SettingField({ field, value, onChange }: SettingFieldPro
                     placeholder={placeholder}
                     autoComplete="off"
                     onChange={(e) => onChange(field.key, e.target.value)}
-                    className="h-9 rounded-md border border-gray-800 bg-[#1C1C1F] px-3 font-mono text-sm text-white placeholder:text-gray-600 disabled:opacity-50"
+                    className="h-9 rounded-md border border-gray-800 bg-[#1C1C1F] px-3 font-mono text-sm text-white placeholder:text-gray-500 disabled:opacity-50"
                 />
             )}
 
             {field.secret && field.displayValue && field.runtimeEditable ? (
-                <p className="text-[10px] text-gray-600">
+                <p className="text-[10px] text-gray-500">
                     Current: <span className="font-mono">{field.displayValue}</span> — type a new
                     value to replace it.
                 </p>

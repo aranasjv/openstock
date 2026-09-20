@@ -2,6 +2,7 @@ import 'server-only';
 
 import { connectToDatabase } from '@/database/mongoose';
 import { Alert } from '@/database/models/alert.model';
+import { isObjectId } from '@/lib/validate';
 
 /**
  * Alert data access.
@@ -51,7 +52,8 @@ export async function getAlertsForUser(userId: string, assetType?: AlertAssetTyp
         return JSON.parse(JSON.stringify(alerts));
     } catch (error) {
         console.error('Error fetching alerts:', error);
-        return [];
+        // Rethrow so a failure is not rendered as "no alerts set".
+        throw new Error('Could not load alerts.');
     }
 }
 
@@ -60,8 +62,9 @@ export async function getAlertsForUser(userId: string, assetType?: AlertAssetTyp
  * surface as an opaque 500. Callers get a plain "not found" instead.
  */
 async function alertForUser(userId: string, alertId: string) {
-    const mongoose = await connectToDatabase();
-    if (!mongoose.isValidObjectId(alertId)) return null;
+    if (!isObjectId(alertId)) return null;
+
+    await connectToDatabase();
     return Alert.findOne({ _id: alertId, userId });
 }
 

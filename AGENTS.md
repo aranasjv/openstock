@@ -225,6 +225,22 @@ Normalize **only** in `lib/ai-provider.ts`; nothing above it should know which p
   for someone else. A query that mutates must also filter by `userId`, not just `_id`.
   Covered by `__tests__/action-authorization.test.ts` and `__tests__/data-owner-scoping.test.ts`.
 - `.actions.ts` transport only: `revalidatePath` belongs there, not in `lib/data/`.
+- **Outbound HTTP goes through `fetchWithTimeout` (`lib/http.ts`).** `DEFAULT_TIMEOUT_MS` for
+  data APIs, `AI_TIMEOUT_MS` for model calls — a slow generation is not a hang. The error it
+  throws names the deadline but **never the URL**: Gemini and Kit put their API keys in the
+  query string, so echoing the URL would write a secret into the logs and the UI.
+- **Validate at the action boundary** with `lib/validate.ts` (`requireText`, `requireNumber`,
+  `requireOneOf`, `isObjectId`). Actions are callable directly, so their arguments are untrusted
+  even when they come from a signed-in user's own browser. Validate the shape before Mongoose
+  sees it: a malformed `_id` throws a `CastError` that reaches the user as an opaque 500.
+- **Never let an infrastructure failure read as "no data".** The readers in `lib/data/` throw;
+  returning `[]`/`false` made an outage indistinguishable from an empty portfolio, and "you hold
+  nothing" is a factual claim about someone's money. Pages fall through to `app/error.tsx`.
+- **`gray-500` (#9095A1, ~6.8:1) is the muted *text* floor.** `gray-600` (#30333A, ~1.6:1) and
+  `gray-700` (#212328, ~1.2:1) are borders and surfaces only — never copy, however decorative it
+  looks. Focus comes from one base `:where(...):focus-visible` rule in `globals.css`, so new
+  hand-rolled controls inherit a visible ring; if you write `focus:outline-none`, you owe a
+  replacement indicator.
 - `/api/*` is excluded from the auth middleware matcher, so API routes must do their own
   auth and must not leak config. `/api/health` reports failures as a status, never as a raw
   driver error (those embed the connection string).

@@ -33,15 +33,15 @@ export default async function HoldingsPage() {
             {/* Totals */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="rounded-xl border border-gray-800 bg-gray-900/30 p-4">
-                    <div className="text-[10px] uppercase tracking-wider text-gray-600">Total value</div>
+                    <div className="text-[10px] uppercase tracking-wider text-gray-500">Total value</div>
                     <div className="mt-1 font-mono text-2xl text-gray-100">{formatPrice(summary.totalValue)}</div>
                 </div>
                 <div className="rounded-xl border border-gray-800 bg-gray-900/30 p-4">
-                    <div className="text-[10px] uppercase tracking-wider text-gray-600">Cost basis</div>
+                    <div className="text-[10px] uppercase tracking-wider text-gray-500">Cost basis</div>
                     <div className="mt-1 font-mono text-2xl text-gray-300">{formatPrice(summary.totalCost)}</div>
                 </div>
                 <div className="rounded-xl border border-gray-800 bg-gray-900/30 p-4">
-                    <div className="text-[10px] uppercase tracking-wider text-gray-600">Profit / loss</div>
+                    <div className="text-[10px] uppercase tracking-wider text-gray-500">Profit / loss</div>
                     <div className={`mt-1 font-mono text-2xl ${pnlClass}`}>
                         {summary.totalPnl >= 0 ? '+' : ''}
                         {formatPrice(summary.totalPnl)}

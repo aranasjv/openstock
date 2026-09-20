@@ -134,7 +134,7 @@ export default function CoinDetailDrawer({ coinId, onClose }: CoinDetailDrawerPr
                 <div className="min-h-0 flex-1 overflow-y-auto">
                     {loading ? (
                         <div className="flex h-40 items-center justify-center">
-                            <Loader2 className="h-5 w-5 animate-spin text-gray-600" />
+                            <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
                         </div>
                     ) : coin ? (
                         <div className="space-y-4 p-4">
@@ -162,7 +162,7 @@ export default function CoinDetailDrawer({ coinId, onClose }: CoinDetailDrawerPr
                                     ['All-time low', coin.atl ? formatCryptoPrice(coin.atl) : 'N/A'],
                                 ].map(([label, value]) => (
                                     <div key={label}>
-                                        <div className="text-[10px] uppercase tracking-wider text-gray-600">
+                                        <div className="text-[10px] uppercase tracking-wider text-gray-500">
                                             {label}
                                         </div>
                                         <div className="font-mono text-xs text-gray-200">{value}</div>

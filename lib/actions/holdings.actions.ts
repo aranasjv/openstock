@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { requireUserId } from '@/lib/session';
+import { requireOneOf, requireText, MAX_SYMBOL_LENGTH } from '@/lib/validate';
 import {
     addHoldingForUser,
     getHoldingsForUser,
@@ -9,6 +10,8 @@ import {
     removeHoldingForUser,
     type HoldingAssetType,
 } from '@/lib/data/portfolio';
+
+const ASSET_TYPES = ['stock', 'crypto'] as const;
 
 /**
  * Holdings, as callable server actions.
@@ -27,21 +30,34 @@ export async function getHoldings(assetType?: HoldingAssetType) {
 }
 
 export async function addHolding(params: {
-    symbol: string;
-    assetType: HoldingAssetType;
+    symbol: unknown;
+    assetType: unknown;
     quantity: number;
     averageCost: number;
 }) {
     const userId = await requireUserId();
-    const holding = await addHoldingForUser(userId, params);
+
+    // Symbol and asset type are validated here; quantity and average cost are checked by the
+    // data layer, which is the single choke point for that write.
+    const holding = await addHoldingForUser(userId, {
+        symbol: requireText(params.symbol, 'Symbol', MAX_SYMBOL_LENGTH),
+        assetType: requireOneOf(params.assetType, 'Asset type', ASSET_TYPES),
+        quantity: params.quantity,
+        averageCost: params.averageCost,
+    });
 
     revalidatePath('/holdings');
     return holding;
 }
 
-export async function removeHolding(symbol: string, assetType: HoldingAssetType = 'stock') {
+export async function removeHolding(symbol: unknown, assetType: unknown = 'stock') {
     const userId = await requireUserId();
-    const result = await removeHoldingForUser(userId, symbol, assetType);
+
+    const result = await removeHoldingForUser(
+        userId,
+        requireText(symbol, 'Symbol', MAX_SYMBOL_LENGTH),
+        requireOneOf(assetType, 'Asset type', ASSET_TYPES)
+    );
 
     revalidatePath('/holdings');
     return result;

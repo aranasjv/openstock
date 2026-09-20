@@ -60,7 +60,7 @@ export default async function Sidebar({ user }: { user: User }) {
 
                 {/* Portfolio snapshot */}
                 <div className="mt-5 rounded-lg border border-gray-800 bg-gray-900/40 p-3">
-                    <div className="text-[10px] uppercase tracking-wider text-gray-600">Portfolio</div>
+                    <div className="text-[10px] uppercase tracking-wider text-gray-500">Portfolio</div>
                     <div className="mt-0.5 font-mono text-lg text-gray-100">
                         {formatPrice(portfolio.totalValue)}
                     </div>
@@ -78,23 +78,23 @@ export default async function Sidebar({ user }: { user: User }) {
                 {/* Top must-buy picks, split by market so both are always represented. */}
                 <div className="mt-3 rounded-lg border border-gray-800 bg-gray-900/40 p-3">
                     <div className="flex items-center justify-between">
-                        <span className="text-[10px] uppercase tracking-wider text-gray-600">
+                        <span className="text-[10px] uppercase tracking-wider text-gray-500">
                             Must buy
                         </span>
-                        <span className="text-[10px] text-gray-600">
+                        <span className="text-[10px] text-gray-500">
                             {getStrategy(strategyId).name}
                         </span>
                     </div>
 
                     <div className="mt-2">
-                        <div className="text-[10px] font-medium uppercase tracking-wider text-gray-700">
+                        <div className="text-[10px] font-medium uppercase tracking-wider text-gray-500">
                             Stocks
                         </div>
                         <SidebarPickRows picks={topStocks} isCrypto={false} />
                     </div>
 
                     <div className="mt-2.5">
-                        <div className="text-[10px] font-medium uppercase tracking-wider text-gray-700">
+                        <div className="text-[10px] font-medium uppercase tracking-wider text-gray-500">
                             Crypto
                         </div>
                         <SidebarPickRows picks={topCrypto} isCrypto />
@@ -107,7 +107,7 @@ export default async function Sidebar({ user }: { user: User }) {
                         className="block truncate rounded-md px-2 py-1.5 text-xs text-gray-500 hover:bg-white/5 hover:text-gray-300"
                     >
                         {user.name}
-                        <span className="block truncate text-[10px] text-gray-600">{user.email}</span>
+                        <span className="block truncate text-[10px] text-gray-500">{user.email}</span>
                     </Link>
 
                     {/*
@@ -115,12 +115,12 @@ export default async function Sidebar({ user }: { user: User }) {
                      * every page; folding them into two compact rows keeps /about, /help and
                      * /terms reachable without costing page height.
                      */}
-                    <div className="flex flex-wrap gap-x-3 gap-y-1 px-2 text-[10px] text-gray-600">
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 px-2 text-[10px] text-gray-500">
                         <Link href="/about" className="hover:text-gray-400">About</Link>
                         <Link href="/help" className="hover:text-gray-400">Help</Link>
                         <Link href="/terms" className="hover:text-gray-400">Terms</Link>
                     </div>
-                    <div className="flex flex-wrap gap-x-3 gap-y-1 px-2 text-[10px] text-gray-700">
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 px-2 text-[10px] text-gray-500">
                         <a
                             href="https://github.com/Open-Dev-Society/OpenStock"
                             target="_blank"

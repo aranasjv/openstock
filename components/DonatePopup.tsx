@@ -83,7 +83,7 @@ export default function DonatePopup() {
                 <div className="flex flex-col sm:flex-row gap-3 mt-6">
                     <Button
                         onClick={handleDonate}
-                        className="flex-1 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-semibold h-11 transition-all duration-200 transform hover:scale-105"
+                        className="flex-1 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-semibold h-11 transition duration-200 transform hover:scale-105"
                     >
                         <Github className="h-4 w-4 mr-2" />
                         Sponsor on GitHub
@@ -91,7 +91,7 @@ export default function DonatePopup() {
                     <Button
                         onClick={handleDismiss}
                         variant="outline"
-                        className="flex-1 border-teal-600/50 text-teal-400 hover:bg-teal-600/10 hover:text-teal-300 h-11 transition-all duration-200"
+                        className="flex-1 border-teal-600/50 text-teal-400 hover:bg-teal-600/10 hover:text-teal-300 h-11 transition duration-200"
                     >
                         Maybe Later
                     </Button>

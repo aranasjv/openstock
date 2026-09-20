@@ -28,7 +28,7 @@ export default function CryptoWatchlistChip({ coinId, coin }: CryptoWatchlistChi
     const price = coin?.currentPrice ?? 0;
 
     return (
-        <div className="group flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700/80 rounded-full border border-gray-700 transition-all">
+        <div className="group flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700/80 rounded-full border border-gray-700 transition">
             <span className="font-semibold text-sm text-white">{label}</span>
 
             {price > 0 ? (

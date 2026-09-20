@@ -24,7 +24,7 @@ interface SidebarPickRowsProps {
  */
 export default function SidebarPickRows({ picks, isCrypto }: SidebarPickRowsProps) {
     if (picks.length === 0) {
-        return <p className="mt-1 text-[10px] text-gray-700">No matches</p>;
+        return <p className="mt-1 text-[10px] text-gray-500">No matches</p>;
     }
 
     return (
@@ -33,7 +33,7 @@ export default function SidebarPickRows({ picks, isCrypto }: SidebarPickRowsProp
                 const label = (
                     <>
                         <span className="truncate text-[11px] text-gray-300">{pick.symbol}</span>
-                        <span className="shrink-0 font-mono text-[10px] text-gray-600">
+                        <span className="shrink-0 font-mono text-[10px] text-gray-500">
                             {isCrypto ? formatCryptoPrice(pick.price) : formatPrice(pick.price)}
                         </span>
                         <span

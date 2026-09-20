@@ -4,6 +4,7 @@ import { getDateRange, validateArticle, formatArticle } from '@/lib/utils';
 import { POPULAR_STOCK_SYMBOLS } from '@/lib/constants';
 import { loadConfig } from '@/lib/config';
 import { cache } from 'react';
+import { fetchWithTimeout } from '@/lib/http';
 
 const DEFAULT_FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
 
@@ -51,7 +52,7 @@ async function fetchJSON<T>(url: string, revalidateSeconds?: number): Promise<T>
         ? { cache: 'force-cache', next: { revalidate: revalidateSeconds } }
         : { cache: 'no-store' };
 
-    const res = await fetch(url, options);
+    const res = await fetchWithTimeout(url, options);
     if (!res.ok) {
         const text = await res.text().catch(() => '');
         throw new Error(`Fetch failed ${res.status}: ${text}`);

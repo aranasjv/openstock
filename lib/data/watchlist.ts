@@ -59,7 +59,8 @@ export async function getWatchlistForUser(userId: string, assetType?: WatchlistA
         return JSON.parse(JSON.stringify(watchlist));
     } catch (error) {
         console.error('Error fetching watchlist:', error);
-        return [];
+        // Rethrow so a failure is not rendered as an empty watchlist.
+        throw new Error('Could not load the watchlist.');
     }
 }
 
@@ -74,7 +75,9 @@ export async function isInWatchlistForUser(
         return !!item;
     } catch (error) {
         console.error('Error checking watchlist status:', error);
-        return false;
+        // False would render as "not tracked yet", so a failure here changes what the button
+        // says. Let it surface instead.
+        throw new Error('Could not check the watchlist.');
     }
 }
 
