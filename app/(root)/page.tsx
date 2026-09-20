@@ -66,8 +66,10 @@ const Home = async ({ searchParams }: HomeProps) => {
                 />
             </section>
 
-            <section className="grid min-h-0 flex-1 gap-2 xl:grid-cols-3">
-                <div className="h-full min-h-0 xl:col-span-2">
+            {/* The screener gets the width it needs and the news column does not take a third
+                of the row by default — the table is the content, the headlines are secondary. */}
+            <section className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[1.9fr_1fr]">
+                <div className="h-full min-h-0">
                     <MustBuySection assetType="stock" strategyId={strategy} />
                 </div>
                 <div className="h-full min-h-0">

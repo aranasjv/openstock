@@ -2,8 +2,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import SidebarNav from '@/components/layout/SidebarNav';
 import SidebarPickRows from '@/components/layout/SidebarPickRows';
-import { searchStocks } from '@/lib/actions/finnhub.actions';
-import { searchCrypto } from '@/lib/actions/crypto.actions';
 import { getPortfolioSummary } from '@/lib/actions/holdings.actions';
 import { runScreener } from '@/lib/actions/screener.actions';
 import { getStrategy, DEFAULT_STRATEGY_ID, isStrategyId } from '@/lib/strategies';
@@ -24,9 +22,10 @@ export default async function Sidebar({ user }: { user: User }) {
         ? config.SCREENER_STRATEGY
         : DEFAULT_STRATEGY_ID;
 
-    const [initialStocks, initialCoins, portfolio, stockResult, cryptoResult] = await Promise.all([
-        searchStocks(),
-        searchCrypto(),
+    // The search palettes used to be hydrated here, which cost two list fetches on every page
+    // render for entries that only the sidebar offered. Each market opens its own search from
+    // its header, so both the entries and this cost are gone.
+    const [portfolio, stockResult, cryptoResult] = await Promise.all([
         getPortfolioSummary(),
         runScreener('stock', strategyId),
         runScreener('crypto', strategyId),
@@ -56,7 +55,7 @@ export default async function Sidebar({ user }: { user: User }) {
                     />
                 </Link>
 
-                <SidebarNav initialStocks={initialStocks} initialCoins={initialCoins} />
+                <SidebarNav />
 
                 {/* Portfolio snapshot */}
                 <div className="mt-5 rounded-lg border border-gray-800 bg-gray-900/40 p-3">

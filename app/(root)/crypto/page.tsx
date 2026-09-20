@@ -91,7 +91,10 @@ export default async function CryptoDashboard({ searchParams }: CryptoDashboardP
 
             {/* One flexible row: every panel takes the remaining height, so all three line up
                 and none of them can push the page taller than the viewport. */}
-            <section className="grid min-h-0 flex-1 gap-2 xl:grid-cols-3">
+            {/* Weighted rather than equal thirds: the screener is the thing you act on, the coin
+                list is the context for it, and the news column is the least scannable of the
+                three. Equal columns gave all of them the same width regardless. */}
+            <section className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[1.1fr_1.6fr_1.1fr]">
                 <div className="h-full min-h-0">
                     <TopCoinsTable coins={markets} />
                 </div>

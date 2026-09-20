@@ -1,8 +1,8 @@
 export const NAV_ITEMS = [
-    { href: '/', label: 'Dashboard' },
+    { href: '/', label: 'Stocks Dashboard' },
     { href: '/search', label: 'Search' },
     { href: '/crypto-search', label: 'Crypto Search' },
-    { href: '/crypto', label: 'Crypto' },
+    { href: '/crypto', label: 'Crypto Dashboard' },
     { href: '/assistant', label: 'Assistant' },
     { href: '/watchlist', label: 'Watchlist' },
     { href: '/holdings', label: 'Holdings' },
