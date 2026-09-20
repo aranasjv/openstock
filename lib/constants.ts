@@ -255,8 +255,15 @@ export const TECHNICAL_ANALYSIS_WIDGET_CONFIG = (symbol: string) => ({
     backgroundColor: '#141414',
     locale: 'en',
     width: '100%',
-    height: 400,
+    height: 560,
     interval: '1h',
+    // `regular` is the full summary — Oscillators, Summary and Moving Averages side by side.
+    // The default collapses to a single gauge, which throws away the most useful signal the
+    // widget carries: where the three disagree.
+    displayMode: 'regular',
+    // The timeframe strip (1m … 1M). A 1h read and a 1d read are different questions, and
+    // nobody is going to re-embed the widget to ask the other one.
+    showIntervalTabs: true,
     largeChartUrl: '',
 });
 

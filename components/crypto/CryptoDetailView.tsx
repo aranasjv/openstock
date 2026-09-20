@@ -89,7 +89,7 @@ export default function CryptoDetailView({
                             <TradingViewWidget
                                 scriptUrl={`${SCRIPT_URL}technical-analysis.js`}
                                 config={TECHNICAL_ANALYSIS_WIDGET_CONFIG(tvSymbol)}
-                                height={380}
+                                height={560}
                             />
                         </>
                     ) : (

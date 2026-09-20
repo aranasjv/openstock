@@ -86,7 +86,7 @@ export default function StockDetailView({
                     <TradingViewWidget
                         scriptUrl={`${SCRIPT_URL}technical-analysis.js`}
                         config={TECHNICAL_ANALYSIS_WIDGET_CONFIG(tvSymbol)}
-                        height={400}
+                        height={560}
                     />
 
                     <TradingViewWidget
